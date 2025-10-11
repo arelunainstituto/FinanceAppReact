@@ -378,12 +378,36 @@ export class ContractRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      // Primeiro, excluir todos os pagamentos relacionados
+      const { error: paymentsError } = await supabase
+        .from('payments')
+        .delete()
+        .eq('contract_id', id);
+
+      if (paymentsError) {
+        console.error('Error deleting related payments:', paymentsError);
+        throw new Error('Failed to delete related payments');
+      }
+
+      // Depois, excluir o contrato
+      const { data, error, count } = await supabase
         .from('contracts')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting contract:', error);
+        throw error;
+      }
+
+      // Verificar se algum registro foi realmente excluído
+      if (!data || data.length === 0) {
+        console.warn(`No contract found with id: ${id}`);
+        return false;
+      }
+
+      console.log(`Successfully deleted contract ${id} and ${count || 0} related records`);
       return true;
     } catch (error) {
       console.error('Error deleting contract:', error);

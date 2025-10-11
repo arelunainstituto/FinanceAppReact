@@ -27,13 +27,10 @@ app.use(cors({
     'http://localhost:3000',
     'http://127.0.0.1:8081',
     'http://127.0.0.1:3000',
-    'https://financeapp-lime.vercel.app',
-    'https://financeapp-frontend.vercel.app',
     'https://financeapp-areluna.vercel.app',
-    'https://*.vercel.app',
-    process.env.FRONTEND_URL || 'https://financeapp-lime.vercel.app',
-    process.env.CORS_ORIGIN?.split(',') || []
-  ].flat().filter(Boolean),
+    process.env.FRONTEND_URL || 'https://financeapp-areluna.vercel.app',
+    ...(process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [])
+  ].filter(Boolean),
   credentials: true,
 }));
 
