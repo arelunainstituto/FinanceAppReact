@@ -1,97 +1,84 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import { logger } from '../backend/src/middlewares/logger';
+import { errorHandler, notFound } from '../backend/src/middlewares/errorHandler';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// Import routes directly
+import authRoutes from '../backend/src/routes/authRoutes';
+import clientRoutes from '../backend/src/routes/clientRoutes';
+import contractRoutes from '../backend/src/routes/contractRoutes';
+import paymentRoutes from '../backend/src/routes/paymentRoutes';
+import dashboardRoutes from '../backend/src/routes/dashboardRoutes';
 
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+// Load environment variables
+dotenv.config();
 
-  // Health check endpoint
-  if (req.url === '/api/health' || req.url === '/health') {
-    res.status(200).json({
-      message: 'ERP Payment Management API is running',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      environment: 'production'
-    });
-    return;
-  }
+const app = express();
 
-  // Auth login endpoint
-  if (req.url === '/api/auth/login' && req.method === 'POST') {
-    try {
-      const { email, password } = req.body;
+// Security middleware
+app.use(helmet());
 
-      // Basic validation
-      if (!email || !password) {
-        res.status(400).json({
-          success: false,
-          error: 'Email and password are required'
-        });
-        return;
-      }
+// CORS configuration - Updated for Vercel deployment
+app.use(cors({
+  origin: [
+    'http://localhost:8081',
+    'http://localhost:3000',
+    'http://127.0.0.1:8081',
+    'http://127.0.0.1:3000',
+    'https://*.vercel.app',
+    'https://financeapp-areluna.vercel.app',
+    process.env.FRONTEND_URL || 'https://your-frontend-domain.vercel.app'
+  ],
+  credentials: true,
+}));
 
-      // Mock authentication (replace with real authentication logic)
-      if (email === 'admin@institutoareluna.pt' && password === 'admin123') {
-        const mockUser = {
-          id: '1',
-          email: 'admin@institutoareluna.pt',
-          name: 'Administrator',
-          role: 'admin',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-        const mockToken = 'mock-jwt-token-' + Date.now();
+// Logging middleware
+app.use(logger);
 
-        res.status(200).json({
-          success: true,
-          data: {
-            user: mockUser,
-            token: mockToken
-          },
-          message: 'Login successful'
-        });
-        return;
-      } else {
-        res.status(401).json({
-          success: false,
-          error: 'Invalid credentials'
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-      return;
-    }
-  }
+// API routes - Direct registration
+app.use('/api/auth', authRoutes);
+app.use('/api/clients', clientRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
-  // Root endpoint
-  if (req.url === '/' || req.url === '/api') {
-    res.status(200).json({
-      message: 'ERP Payment Management API',
-      version: '1.0.0',
-      documentation: '/api/health',
-      status: 'online',
-      endpoints: ['/api/health', '/api/auth/login']
-    });
-    return;
-  }
-
-  // Default 404 response
-  res.status(404).json({
-    error: 'Not Found',
-    message: 'The requested endpoint was not found',
-    availableEndpoints: ['/api/health', '/api/auth/login']
+// Health check route
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({
+    message: 'ERP Payment Management API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'production',
   });
-}
+});
+
+// Root route
+app.get('/', (_req, res) => {
+  res.json({
+    message: 'ERP Payment Management API',
+    version: '1.0.0',
+    documentation: '/api/health',
+    availableEndpoints: [
+      '/api/health',
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/clients',
+      '/api/contracts',
+      '/api/payments',
+      '/api/dashboard/stats'
+    ]
+  });
+});
+
+// Error handling middleware
+app.use(notFound);
+app.use(errorHandler);
+
+// Export the Express app for Vercel
+export default app;

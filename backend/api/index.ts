@@ -20,17 +20,20 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - Updated for Vercel deployment
+// CORS configuration - Updated for Vercel deployment with dynamic domains
 app.use(cors({
   origin: [
     'http://localhost:8081',
     'http://localhost:3000',
     'http://127.0.0.1:8081',
     'http://127.0.0.1:3000',
+    'https://financeapp-lime.vercel.app',
+    'https://financeapp-frontend.vercel.app',
+    'https://financeapp-areluna.vercel.app',
     'https://*.vercel.app',
-    'https://financeapp-3a43krgly-areluna.vercel.app',
-    process.env.FRONTEND_URL || 'https://your-frontend-domain.vercel.app'
-  ],
+    process.env.FRONTEND_URL || 'https://financeapp-lime.vercel.app',
+    process.env.CORS_ORIGIN?.split(',') || []
+  ].flat().filter(Boolean),
   credentials: true,
 }));
 
