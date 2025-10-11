@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
   }
   
   // Always use production domain - no localhost
-  return 'https://financeapp-lime.vercel.app/api';
+  return 'https://financeapp-areluna.vercel.app/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
