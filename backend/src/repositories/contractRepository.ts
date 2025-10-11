@@ -378,40 +378,78 @@ export class ContractRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
+      console.log(`Starting deletion process for contract: ${id}`);
+      
+      // Primeiro, verificar se o contrato existe
+      const { data: existingContract, error: findError } = await supabase
+        .from('contracts')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (findError || !existingContract) {
+        console.warn(`Contract not found for deletion: ${id}`);
+        throw new Error('Contract not found');
+      }
+
+      console.log(`Contract found, proceeding with deletion: ${id}`);
+
       // Primeiro, excluir todos os pagamentos relacionados
-      const { error: paymentsError } = await supabase
+      const { data: deletedPayments, error: paymentsError, count: paymentsCount } = await supabase
         .from('payments')
         .delete()
-        .eq('contract_id', id);
+        .eq('contract_id', id)
+        .select();
 
       if (paymentsError) {
         console.error('Error deleting related payments:', paymentsError);
         throw new Error('Failed to delete related payments');
       }
 
+      console.log(`Deleted ${paymentsCount || 0} related payments`);
+
       // Depois, excluir o contrato
-      const { data, error, count } = await supabase
+      const { data: deletedContract, error: contractError, count: contractCount } = await supabase
         .from('contracts')
         .delete()
         .eq('id', id)
         .select();
 
-      if (error) {
-        console.error('Error deleting contract:', error);
-        throw error;
+      if (contractError) {
+        console.error('Error deleting contract:', contractError);
+        throw new Error(`Failed to delete contract: ${contractError.message}`);
       }
+
+      console.log(`Delete operation result:`, {
+        deletedContract,
+        contractCount,
+        hasData: !!deletedContract,
+        dataLength: deletedContract?.length || 0
+      });
 
       // Verificar se algum registro foi realmente excluído
-      if (!data || data.length === 0) {
-        console.warn(`No contract found with id: ${id}`);
-        return false;
+      if (!deletedContract || deletedContract.length === 0) {
+        console.error(`No contract was deleted for id: ${id}`);
+        throw new Error('Contract deletion failed - no records affected');
       }
 
-      console.log(`Successfully deleted contract ${id} and ${count || 0} related records`);
+      // Verificar se o contrato ainda existe após a exclusão
+      const { data: stillExists, error: verifyError } = await supabase
+        .from('contracts')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (!verifyError && stillExists) {
+        console.error(`Contract still exists after deletion attempt: ${id}`);
+        throw new Error('Contract deletion failed - record still exists');
+      }
+
+      console.log(`Successfully deleted contract ${id} and ${paymentsCount || 0} related payments`);
       return true;
     } catch (error) {
-      console.error('Error deleting contract:', error);
-      throw new Error('Failed to delete contract');
+      console.error('Error in delete method:', error);
+      throw error;
     }
   }
 
