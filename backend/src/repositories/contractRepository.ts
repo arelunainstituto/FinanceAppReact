@@ -377,80 +377,109 @@ export class ContractRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    try {
-      console.log(`Starting deletion process for contract: ${id}`);
-      
-      // Primeiro, verificar se o contrato existe
-      const { data: existingContract, error: findError } = await supabase
-        .from('contracts')
-        .select('id')
-        .eq('id', id)
-        .single();
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 segundo
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Starting deletion process for contract: ${id} (attempt ${attempt}/${maxRetries})`);
+        
+        // Primeiro, verificar se o contrato existe
+        const { data: existingContract, error: findError } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('id', id)
+          .single();
 
-      if (findError || !existingContract) {
-        console.warn(`Contract not found for deletion: ${id}`);
-        throw new Error('Contract not found');
+        if (findError || !existingContract) {
+          console.warn(`Contract not found for deletion: ${id}`);
+          throw new Error('Contract not found');
+        }
+
+        console.log(`Contract found, proceeding with deletion: ${id}`);
+
+        // Usar uma transação explícita para garantir consistência
+        // Primeiro excluir pagamentos manualmente para ter controle total
+        const { error: paymentsDeleteError } = await supabase
+          .from('payments')
+          .delete()
+          .eq('contract_id', id);
+
+        if (paymentsDeleteError) {
+          console.warn(`Warning deleting payments for contract ${id}:`, paymentsDeleteError);
+          // Continuar mesmo se não houver pagamentos para excluir
+        }
+
+        // Aguardar um pouco para garantir que a operação seja processada
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+        }
+
+        // Excluir o contrato
+        const { data: deletedContract, error: contractError, count: contractCount } = await supabase
+          .from('contracts')
+          .delete()
+          .eq('id', id)
+          .select();
+
+        if (contractError) {
+          console.error(`Error deleting contract (attempt ${attempt}):`, contractError);
+          if (attempt === maxRetries) {
+            throw new Error(`Failed to delete contract after ${maxRetries} attempts: ${contractError.message}`);
+          }
+          continue; // Tentar novamente
+        }
+
+        console.log(`Delete operation result (attempt ${attempt}):`, {
+          deletedContract,
+          contractCount,
+          hasData: !!deletedContract,
+          dataLength: deletedContract?.length || 0
+        });
+
+        // Verificar se algum registro foi realmente excluído
+        if (!deletedContract || deletedContract.length === 0) {
+          console.error(`No contract was deleted for id: ${id} (attempt ${attempt})`);
+          if (attempt === maxRetries) {
+            throw new Error('Contract deletion failed - no records affected after all attempts');
+          }
+          continue; // Tentar novamente
+        }
+
+        // Aguardar um pouco antes da verificação final para dar tempo ao banco processar
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verificar se o contrato ainda existe após a exclusão
+        const { data: stillExists, error: verifyError } = await supabase
+          .from('contracts')
+          .select('id')
+          .eq('id', id)
+          .single();
+
+        if (!verifyError && stillExists) {
+          console.error(`Contract still exists after deletion attempt ${attempt}: ${id}`);
+          if (attempt === maxRetries) {
+            throw new Error('Contract deletion failed - record still exists after all attempts');
+          }
+          continue; // Tentar novamente
+        }
+
+        console.log(`Successfully deleted contract ${id} on attempt ${attempt}`);
+        return true;
+
+      } catch (error) {
+        console.error(`Error in delete method (attempt ${attempt}):`, error);
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Aguardar antes da próxima tentativa
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
       }
-
-      console.log(`Contract found, proceeding with deletion: ${id}`);
-
-      // Primeiro, excluir todos os pagamentos relacionados
-      const { data: deletedPayments, error: paymentsError, count: paymentsCount } = await supabase
-        .from('payments')
-        .delete()
-        .eq('contract_id', id)
-        .select();
-
-      if (paymentsError) {
-        console.error('Error deleting related payments:', paymentsError);
-        throw new Error('Failed to delete related payments');
-      }
-
-      console.log(`Deleted ${paymentsCount || 0} related payments`);
-
-      // Depois, excluir o contrato
-      const { data: deletedContract, error: contractError, count: contractCount } = await supabase
-        .from('contracts')
-        .delete()
-        .eq('id', id)
-        .select();
-
-      if (contractError) {
-        console.error('Error deleting contract:', contractError);
-        throw new Error(`Failed to delete contract: ${contractError.message}`);
-      }
-
-      console.log(`Delete operation result:`, {
-        deletedContract,
-        contractCount,
-        hasData: !!deletedContract,
-        dataLength: deletedContract?.length || 0
-      });
-
-      // Verificar se algum registro foi realmente excluído
-      if (!deletedContract || deletedContract.length === 0) {
-        console.error(`No contract was deleted for id: ${id}`);
-        throw new Error('Contract deletion failed - no records affected');
-      }
-
-      // Verificar se o contrato ainda existe após a exclusão
-      const { data: stillExists, error: verifyError } = await supabase
-        .from('contracts')
-        .select('id')
-        .eq('id', id)
-        .single();
-
-      if (!verifyError && stillExists) {
-        console.error(`Contract still exists after deletion attempt: ${id}`);
-        throw new Error('Contract deletion failed - record still exists');
-      }
-
-      console.log(`Successfully deleted contract ${id} and ${paymentsCount || 0} related payments`);
-      return true;
-    } catch (error) {
-      console.error('Error in delete method:', error);
-      throw error;
     }
+
+    throw new Error(`Failed to delete contract ${id} after ${maxRetries} attempts`);
   }
 
   async findByStatus(status: string): Promise<Contract[]> {
