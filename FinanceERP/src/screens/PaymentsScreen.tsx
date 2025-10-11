@@ -326,7 +326,8 @@ const PaymentsScreen: React.FC = () => {
     try {
       const response = await ApiService.deletePayment(paymentToDelete.id);
       if (response.success) {
-        setPayments(payments.filter(payment => payment.id !== paymentToDelete.id));
+        // Reload data from server to ensure consistency
+        await loadPayments();
         Alert.alert('Sucesso', 'Pagamento excluído com sucesso');
       } else {
         Alert.alert('Erro', 'Não foi possível excluir o pagamento');

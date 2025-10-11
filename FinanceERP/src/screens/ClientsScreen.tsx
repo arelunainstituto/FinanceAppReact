@@ -187,7 +187,18 @@ const ClientsScreen: React.FC = () => {
       setIsSubmitting(true);
       const response = await ApiService.deleteClient(clientToDelete.id);
       if (response.success) {
-        setClients(clients.filter(c => c.id !== clientToDelete.id));
+        // Recarregar os dados do servidor para garantir consistência
+        // Aplicar os mesmos filtros que estão atualmente ativos
+        const currentFilters: Record<string, any> = { ...appliedFilters };
+        
+        // Adicionar filtro de pesquisa se existir
+        if (searchQuery.trim()) {
+          currentFilters.search = searchQuery.trim();
+        }
+        
+        // Recarregar clientes com os filtros atuais
+        await loadClients();
+        
         Alert.alert('Sucesso', 'Cliente excluído com sucesso');
       }
     } catch (error) {
