@@ -205,7 +205,34 @@ useEffect(() => {
     try {
       const response = await ApiService.deleteContract(contractToDelete.id);
       if (response.success) {
-        setContracts(contracts.filter(c => c.id !== contractToDelete.id));
+        // Recarregar os dados do servidor para garantir consistência
+        // Aplicar os mesmos filtros que estão atualmente ativos
+        const currentFilters: Record<string, any> = {};
+        
+        // Adicionar filtro de cliente se existir
+        if (route.params?.clientId) {
+          currentFilters.client_id = route.params.clientId;
+        }
+        
+        // Adicionar filtro de pesquisa se existir
+        if (searchQuery.trim()) {
+          currentFilters.search = searchQuery.trim();
+        }
+        
+        // Adicionar filtros avançados se existirem
+        Object.keys(advancedFilters).forEach(key => {
+          const value = advancedFilters[key as keyof ContractAdvancedFiltersData];
+          if (value !== undefined && value !== null && value !== '') {
+            currentFilters[key] = value;
+          }
+        });
+        
+        // Converter datas para formato da API se necessário
+        const filtersWithConvertedDates = convertDateFiltersToApiFormat(currentFilters);
+        
+        // Recarregar contratos com os filtros atuais
+        await loadContracts(Object.keys(filtersWithConvertedDates).length > 0 ? filtersWithConvertedDates : undefined);
+        
         Alert.alert('Sucesso', 'Contrato excluído com sucesso');
       }
     } catch (error) {
