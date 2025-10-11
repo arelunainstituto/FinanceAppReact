@@ -19,16 +19,14 @@ const schedulerService = new SchedulerService();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-app.use(cors({
-  origin: [
-    'http://localhost:8081',
-    'http://localhost:3000',
-    'http://127.0.0.1:8081',
-    'http://127.0.0.1:3000'
-  ],
+// CORS configuration - production only
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'],
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

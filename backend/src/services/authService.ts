@@ -110,7 +110,7 @@ export class AuthService {
       
       // Use Supabase Auth to send password reset email
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'http://localhost:8081/reset-password', // Frontend URL for password reset
+        redirectTo: 'https://financeapp-areluna.vercel.app/reset-password', // Production frontend URL for password reset
       });
 
       if (error) {
