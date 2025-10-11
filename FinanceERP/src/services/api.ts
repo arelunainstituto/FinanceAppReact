@@ -1,20 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '../types';
 
-// API Configuration - Fixed URL for production
+// API Configuration - Fixed URL for production only
 const getApiBaseUrl = () => {
   // Use environment variable if available
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
-  // Production environment - use fixed domain
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://financeapp-areluna.vercel.app/api';
-  }
-  
-  // Development environment
-  return 'http://localhost:3000/api';
+  // Always use production domain - no localhost
+  return 'https://financeapp-lime.vercel.app/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
