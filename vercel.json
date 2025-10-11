@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/_expo/static/(.*)",
+      "destination": "/FinanceERP/dist/_expo/static/$1"
+    },
+    {
+      "source": "/assets/(.*)",
+      "destination": "/FinanceERP/dist/assets/$1"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/FinanceERP/dist/favicon.ico"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/FinanceERP/dist/index.html"
+    }
+  ],
+  "buildCommand": "cd FinanceERP && npm install && npm run vercel-build",
+  "outputDirectory": "FinanceERP/dist",
+  "framework": "create-react-app",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30
+    }
+  }
+}

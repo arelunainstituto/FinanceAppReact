@@ -11,11 +11,18 @@
   ],
   "routes": [
     {
+      "src": "/_expo/(.*)",
+      "dest": "/_expo/$1"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/favicon.ico"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
   ],
   "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist",
-  "framework": "react"
+  "outputDirectory": "dist"
 }

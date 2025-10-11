@@ -1,3 +1,4 @@
 # Trae IDE
 .trae/
 *.trae
+.vercel

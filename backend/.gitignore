@@ -67,3 +67,4 @@ ehthumbs.db
 Thumbs.db
 
 # Database migrations are tracked in git
+.vercel
