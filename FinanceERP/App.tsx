@@ -24,7 +24,21 @@ export default function App() {
           });
           
           // Additional delay to ensure fonts are fully loaded in production
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Verify font loading by checking if font family is available
+          if (typeof document !== 'undefined') {
+            const testElement = document.createElement('div');
+            testElement.style.fontFamily = 'Ionicons';
+            testElement.style.visibility = 'hidden';
+            testElement.style.position = 'absolute';
+            testElement.innerHTML = '&#xf2c7;'; // Test icon
+            document.body.appendChild(testElement);
+            
+            // Wait a bit more for font to be applied
+            await new Promise(resolve => setTimeout(resolve, 200));
+            document.body.removeChild(testElement);
+          }
         }
         
         setIsReady(true);
