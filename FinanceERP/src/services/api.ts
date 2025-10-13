@@ -1,15 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '../types';
 
-// API Configuration - Fixed URL for production only
+// API Configuration - Dynamic URL based on current domain
 const getApiBaseUrl = () => {
   // Use environment variable if available
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
-  // Always use production domain - no localhost
-  return 'https://financeapp-9m2i085o8-areluna.vercel.app/api';
+  // For web deployment, use same domain as frontend
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api`;
+  }
+  
+  // Fallback for server-side rendering or React Native
+  return 'https://financeapp-areluna.vercel.app/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
