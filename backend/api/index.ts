@@ -29,6 +29,7 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'https://financeapp-areluna.vercel.app',
     'https://financeapp-cak7jo921-areluna.vercel.app',
+    'https://financeiro.institutoareluna.pt',
     process.env.FRONTEND_URL || 'https://financeapp-areluna.vercel.app',
     ...(process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [])
   ].filter(Boolean),

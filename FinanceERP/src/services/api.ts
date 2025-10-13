@@ -13,8 +13,8 @@ const getApiBaseUrl = () => {
     return `${window.location.origin}/api`;
   }
   
-  // Fallback for server-side rendering or React Native
-  return 'https://financeapp-areluna.vercel.app/api';
+  // Fallback for server-side rendering or React Native - use fixed domain
+  return 'https://financeiro.institutoareluna.pt/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
