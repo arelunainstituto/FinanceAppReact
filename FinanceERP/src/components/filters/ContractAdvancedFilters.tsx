@@ -26,8 +26,8 @@ export interface ContractAdvancedFiltersData {
   created_at_to?: string;
   
   // Value filters
-  value_from?: string;
-  value_to?: string;
+  value_min?: string;
+  value_max?: string;
   
   // Contract specific filters
   contract_number?: string;
@@ -243,8 +243,8 @@ const ContractAdvancedFilters: React.FC<ContractAdvancedFiltersProps> = ({
               <View style={styles.valueField}>
                 <Input
                   label="Valor - De:"
-                  value={filters.value_from || ''}
-                  onChangeText={(text) => updateFilter('value_from', text)}
+                  value={filters.value_min || ''}
+                  onChangeText={(text) => updateFilter('value_min', text)}
                   placeholder="0,00"
                   keyboardType="numeric"
                 />
@@ -252,8 +252,8 @@ const ContractAdvancedFilters: React.FC<ContractAdvancedFiltersProps> = ({
               <View style={styles.valueField}>
                 <Input
                   label="Até:"
-                  value={filters.value_to || ''}
-                  onChangeText={(text) => updateFilter('value_to', text)}
+                  value={filters.value_max || ''}
+                  onChangeText={(text) => updateFilter('value_max', text)}
                   placeholder="0,00"
                   keyboardType="numeric"
                 />

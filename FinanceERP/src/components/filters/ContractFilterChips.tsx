@@ -33,6 +33,8 @@ const ContractFilterChips: React.FC<ContractFilterChipsProps> = ({
       // Value filters
       value_from: 'Valor de',
       value_to: 'Valor até',
+      value_min: 'Valor mínimo',
+      value_max: 'Valor máximo',
       
       // Contract filters
       contract_number: 'Nº Contrato',

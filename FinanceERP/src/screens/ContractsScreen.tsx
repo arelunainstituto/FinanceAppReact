@@ -103,11 +103,26 @@ const ContractsScreen: React.FC = () => {
       filters.client_id = clientId;
     }
 
-    // Add advanced filters
+    // Add advanced filters with field name mapping
     Object.keys(advancedFilters).forEach(key => {
       const value = advancedFilters[key as keyof ContractAdvancedFiltersData];
       if (value !== undefined && value !== null && value !== '') {
-        filters[key] = value;
+        // Map frontend field names to backend field names
+        if (key === 'value_min') {
+          const numericValue = parseFloat(value.toString().replace(',', '.'));
+          if (!isNaN(numericValue)) {
+            filters.value_min = numericValue;
+            console.log('🔍 Setting value_min filter:', numericValue);
+          }
+        } else if (key === 'value_max') {
+          const numericValue = parseFloat(value.toString().replace(',', '.'));
+          if (!isNaN(numericValue)) {
+            filters.value_max = numericValue;
+            console.log('🔍 Setting value_max filter:', numericValue);
+          }
+        } else {
+          filters[key] = value;
+        }
       }
     });
 
