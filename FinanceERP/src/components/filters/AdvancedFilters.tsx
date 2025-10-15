@@ -70,6 +70,7 @@ const paymentMethods = [
   { value: 'TRF ou RECEÇÃO', label: 'TRF ou RECEÇÃO' },
   { value: 'Ordenado', label: 'Ordenado' },
   { value: 'Numerário', label: 'Numerário' },
+  { value: 'MB Way', label: 'MB Way' },
 ];
 
 const paymentTypes = [

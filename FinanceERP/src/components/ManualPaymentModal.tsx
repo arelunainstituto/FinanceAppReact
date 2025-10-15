@@ -24,7 +24,7 @@ interface ManualPaymentModalProps {
   } | null;
   contractPositiveBalance?: number;
   contractNegativeBalance?: number;
-  onConfirm: (paymentAmount: number, usePositiveBalance?: number) => Promise<void>;
+  onConfirm: (paymentAmount: number, usePositiveBalance?: number, paymentMethod?: string) => Promise<void>;
 }
 
 export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
@@ -37,7 +37,27 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
 }) => {
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [usePositiveBalance, setUsePositiveBalance] = useState<string>('0');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Payment method options - same as PaymentForm
+  const paymentMethodOptions = [
+    { value: 'DD', label: 'DD' },
+    { value: 'TRF', label: 'Transferência' },
+    { value: 'Stripe', label: 'Stripe' },
+    { value: 'PP', label: 'PP' },
+    { value: 'Receção', label: 'Receção' },
+    { value: 'TRF ou RECEÇÃO', label: 'TRF ou Receção' },
+    { value: 'TRF - OP', label: 'TRF - OP' },
+    { value: 'bank_transfer', label: 'Transferência Bancária' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Cheque/Misto', label: 'Cheque/Misto' },
+    { value: 'Aditamento', label: 'Aditamento' },
+    { value: 'DD + TB', label: 'DD + TB' },
+    { value: 'Ordenado', label: 'Ordenado' },
+    { value: 'Numerário', label: 'Numerário' },
+    { value: 'MB Way', label: 'MB Way' },
+  ];
 
   // Reset form when modal opens - MUST be called before any early returns
   useEffect(() => {
@@ -45,6 +65,7 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
       console.log('🔍 Modal ficou visível, resetando form');
       setPaymentAmount('');
       setUsePositiveBalance('0');
+      setSelectedPaymentMethod('');
     }
   }, [visible]);
 
@@ -90,6 +111,11 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
       return;
     }
 
+    if (!selectedPaymentMethod) {
+      Alert.alert('Erro', 'Por favor, selecione um método de pagamento');
+      return;
+    }
+
     if (positiveBalanceToUse < 0) {
       Alert.alert('Erro', 'O valor do saldo positivo não pode ser negativo');
       return;
@@ -102,7 +128,7 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onConfirm(amount, positiveBalanceToUse);
+      await onConfirm(amount, positiveBalanceToUse, selectedPaymentMethod);
     } catch (error) {
       Alert.alert('Erro', 'Falha ao processar pagamento');
     } finally {
@@ -294,6 +320,34 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
                 </Text>
               </View>
             </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Seção de Método de Pagamento */}
+        <View style={styles.inputSection}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="card-outline" size={18} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Método de Pagamento</Text>
+          </View>
+          
+          <View style={styles.paymentMethodContainer}>
+            {paymentMethodOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.paymentMethodOption,
+                  selectedPaymentMethod === option.value && styles.paymentMethodOptionSelected
+                ]}
+                onPress={() => setSelectedPaymentMethod(option.value)}
+              >
+                <Text style={[
+                  styles.paymentMethodOptionText,
+                  selectedPaymentMethod === option.value && styles.paymentMethodOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -678,5 +732,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 8,
+  },
+  paymentMethodContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  paymentMethodOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  paymentMethodOptionSelected: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  paymentMethodOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  paymentMethodOptionTextSelected: {
+    color: '#FFFFFF',
   },
 });

@@ -265,7 +265,7 @@ class ApiService {
     });
   }
 
-  async processManualPayment(id: string, amount: number, usePositiveBalance?: number): Promise<ApiResponse<{
+  async processManualPayment(id: string, amount: number, usePositiveBalance?: number, paymentMethod?: string): Promise<ApiResponse<{
     payment: Payment;
     newPayment?: Payment;
     contractUpdated?: boolean;
@@ -273,7 +273,7 @@ class ApiService {
   }>> {
     return this.request(`/payments/${id}/manual-payment`, {
       method: 'POST',
-      body: JSON.stringify({ amount, usePositiveBalance }),
+      body: JSON.stringify({ amount, usePositiveBalance, paymentMethod }),
     });
   }
 

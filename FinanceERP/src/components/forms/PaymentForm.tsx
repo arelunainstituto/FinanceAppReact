@@ -246,6 +246,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     { value: 'DD + TB', label: 'DD + TB' },
     { value: 'Ordenado', label: 'Ordenado' },
     { value: 'Numerário', label: 'Numerário' },
+    { value: 'MB Way', label: 'MB Way' },
   ];
 
   return (
@@ -324,6 +325,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 onChangeText={(value) => updateField('paid_amount', value)}
                 placeholder="0,00"
                 keyboardType="numeric"
+                editable={formData.status !== 'pending'}
+                style={formData.status === 'pending' ? styles.disabledInput : undefined}
               />
             </View>
 
@@ -591,6 +594,11 @@ const styles = StyleSheet.create({
   contractClient: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  disabledInput: {
+    backgroundColor: '#F9FAFB',
+    color: '#9CA3AF',
+    opacity: 0.6,
   },
 });
 
