@@ -130,3 +130,34 @@ export const daysDifference = (date1: string | Date, date2: string | Date = new 
     return 0;
   }
 };
+
+/**
+ * Calcula o último dia útil do mês (segunda a sexta-feira)
+ * @param date - Data de referência (padrão: data atual)
+ * @returns Data do último dia útil do mês
+ */
+export const getLastBusinessDayOfMonth = (date: string | Date = new Date()): Date => {
+  try {
+    const referenceDate = new Date(date);
+    
+    // Obter o último dia do mês
+    const lastDayOfMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    
+    // Verificar o dia da semana (0 = domingo, 1 = segunda, ..., 6 = sábado)
+    let dayOfWeek = lastDayOfMonth.getDay();
+    
+    // Se for sábado (6), retroceder 1 dia para sexta
+    if (dayOfWeek === 6) {
+      lastDayOfMonth.setDate(lastDayOfMonth.getDate() - 1);
+    }
+    // Se for domingo (0), retroceder 2 dias para sexta
+    else if (dayOfWeek === 0) {
+      lastDayOfMonth.setDate(lastDayOfMonth.getDate() - 2);
+    }
+    
+    return lastDayOfMonth;
+  } catch (error) {
+    console.error('Erro ao calcular último dia útil do mês:', error);
+    return new Date();
+  }
+};

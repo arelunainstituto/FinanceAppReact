@@ -166,7 +166,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   };
 
   const updateField = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Se o status foi alterado para 'pending', limpar a data de pagamento
+      if (field === 'status' && value === 'pending') {
+        newData.paid_date = '';
+      }
+      
+      return newData;
+    });
+    
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
