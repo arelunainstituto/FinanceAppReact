@@ -1,5 +1,6 @@
 import { supabase } from '../config/database';
 import { Payment } from '../models';
+import { getCurrentOrLastBusinessDay } from '../utils/dateUtils';
 
 export interface PaginationOptions {
   page?: number;
@@ -828,9 +829,18 @@ export class PaymentRepository {
 
   async update(id: string, paymentData: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<Payment | null> {
     try {
+      // Convert undefined to null for fields that need to be cleared in Supabase
+      const supabaseData = { ...paymentData };
+      if (paymentData.paid_date === undefined) {
+        supabaseData.paid_date = null as any;
+      }
+      if (paymentData.paid_amount === undefined) {
+        supabaseData.paid_amount = null as any;
+      }
+
       const { data, error } = await supabase
         .from('payments')
-        .update(paymentData)
+        .update(supabaseData)
         .eq('id', id)
         .select(`
           *,
@@ -842,6 +852,7 @@ export class PaymentRepository {
         .single();
 
       if (error) throw error;
+      
       return data || null;
     } catch (error) {
       console.error('Error updating payment:', error);
@@ -912,11 +923,12 @@ export class PaymentRepository {
 
   async markAsPaid(id: string): Promise<Payment | null> {
     try {
+      const businessDay = getCurrentOrLastBusinessDay();
       const { data, error } = await supabase
         .from('payments')
         .update({
           status: 'paid',
-          paidDate: new Date().toISOString(),
+          paid_date: businessDay.toISOString().split('T')[0], // Formato YYYY-MM-DD do dia útil atual ou anterior
         })
         .eq('id', id)
         .select(`

@@ -2,6 +2,7 @@ import { PaymentRepository, PaginationOptions, PaginatedResult, PaymentFilters }
 import { ContractRepository } from '../repositories/contractRepository';
 import { Payment } from '../models';
 import { createError } from '../middlewares/errorHandler';
+import { getCurrentOrLastBusinessDay } from '../utils/dateUtils';
 
 export class PaymentService {
   private paymentRepository: PaymentRepository;
@@ -104,9 +105,23 @@ export class PaymentService {
       }
     }
 
-    // If marking as paid, set paid_date
-    if (paymentData.status === 'paid' && !paymentData.paid_date) {
-      paymentData.paid_date = new Date();
+    // If marking as paid, set paid_date to current or last business day and paid_amount if not provided
+    if (paymentData.status === 'paid') {
+      if (!paymentData.paid_date) {
+        const businessDay = getCurrentOrLastBusinessDay();
+        paymentData.paid_date = businessDay;
+      }
+      
+      // If paid_amount is not provided or is 0, set it to the original payment amount
+      if (paymentData.paid_amount === undefined || paymentData.paid_amount === 0) {
+        paymentData.paid_amount = existingPayment.amount;
+      }
+    }
+
+    // If marking as pending, clear paid_date and paid_amount
+    if (paymentData.status === 'pending') {
+      paymentData.paid_date = undefined;
+      paymentData.paid_amount = undefined;
     }
 
     // Clean up empty string fields to prevent enum errors
@@ -208,10 +223,12 @@ export class PaymentService {
       });
     }
 
-    // Marcar pagamento como pago com o valor original
+    // Marcar pagamento como pago com o valor original e data automática (dia útil atual ou anterior)
+    const businessDay = getCurrentOrLastBusinessDay();
     const updatedPayment = await this.paymentRepository.update(id, {
       status: 'paid',
-      paid_amount: originalAmount
+      paid_amount: originalAmount,
+      paid_date: businessDay
     });
 
     if (!updatedPayment) {
@@ -264,7 +281,7 @@ export class PaymentService {
     };
   }
 
-  async processManualPayment(paymentId: string, amount: number, usePositiveBalance: number = 0): Promise<{
+  async processManualPayment(paymentId: string, amount: number, usePositiveBalance: number = 0, paymentMethod?: string): Promise<{
     payment: Payment;
     newPayment?: Payment;
     contractUpdated?: boolean;
@@ -315,10 +332,13 @@ export class PaymentService {
     if (amount < finalInstallmentValue) {
       const remainingDebt = finalInstallmentValue - amount;
       
-      // Atualizar pagamento como pago com valor parcial
+      // Atualizar pagamento como pago com valor parcial e data automática
+      const businessDay = getCurrentOrLastBusinessDay();
       const updatedPayment = await this.paymentRepository.update(paymentId, {
         status: 'paid',
-        paid_amount: amount + usePositiveBalance // Valor efetivamente pago + saldo usado
+        paid_amount: amount + usePositiveBalance, // Valor efetivamente pago + saldo usado
+        paid_date: businessDay,
+        payment_method: paymentMethod
       });
       
       // Adicionar valor restante ao saldo negativo do contrato
@@ -348,10 +368,13 @@ export class PaymentService {
     
     // Caso 2: Pagamento exato (após aplicar saldo positivo)
     if (amount === finalInstallmentValue) {
-      // Atualizar pagamento como pago
+      // Atualizar pagamento como pago com data automática (dia útil atual ou anterior)
+      const businessDay = getCurrentOrLastBusinessDay();
       const updatedPayment = await this.paymentRepository.update(paymentId, {
         status: 'paid',
-        paid_amount: originalAmount // Valor original da parcela
+        paid_amount: originalAmount, // Valor original da parcela
+        paid_date: businessDay,
+        payment_method: paymentMethod
       });
       
       // Atualizar saldo positivo do contrato se foi usado
@@ -376,10 +399,13 @@ export class PaymentService {
     if (amount > finalInstallmentValue) {
       const excessAmount = amount - finalInstallmentValue;
       
-      // Atualizar pagamento como pago
+      // Atualizar pagamento como pago com data automática (dia útil atual ou anterior)
+      const businessDay = getCurrentOrLastBusinessDay();
       const updatedPayment = await this.paymentRepository.update(paymentId, {
         status: 'paid',
-        paid_amount: originalAmount // Valor original da parcela
+        paid_amount: originalAmount, // Valor original da parcela
+        paid_date: businessDay,
+        payment_method: paymentMethod
       });
       
       // Primeiro aplicar o excesso para quitar dívidas (saldo negativo)

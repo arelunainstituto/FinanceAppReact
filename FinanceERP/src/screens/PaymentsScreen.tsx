@@ -505,14 +505,21 @@ const PaymentsScreen: React.FC = () => {
 
   const markAsPago = async (paymentId: string) => {
     try {
-      // Simulate API call
-      const updatedPayments = payments.map(payment => 
-        payment.id === paymentId 
-          ? { ...payment, status: 'paid' as const, paid_date: new Date().toISOString() }
-          : payment
-      );
-      setPayments(updatedPayments);
-      Alert.alert('Sucesso', 'Pagamento marcado como pago');
+      const response = await ApiService.updatePayment(paymentId, { 
+        status: 'paid'
+        // Removido paid_amount: 0 para permitir que o backend defina automaticamente
+        // tanto o paid_amount quanto o paid_date
+      });
+      
+      if (response.success && response.data) {
+        const updatedPayments = payments.map(payment => 
+          payment.id === paymentId ? response.data : payment
+        );
+        setPayments(updatedPayments);
+        Alert.alert('Sucesso', 'Pagamento marcado como pago');
+      } else {
+        throw new Error(response.message || 'Erro ao marcar pagamento como pago');
+      }
     } catch (error) {
       console.error('Error marking payment as paid:', error);
       Alert.alert('Erro', 'Não foi possível atualizar o pagamento');
@@ -544,9 +551,19 @@ const PaymentsScreen: React.FC = () => {
         // Se não está pago, usar a lógica de pagamento manual com valor total
         const response = await ApiService.processManualPayment(payment.id, payment.amount);
         
-        if (response.success) {
+        if (response.success && response.data) {
+          // Atualizar o estado local imediatamente com o pagamento atualizado
+          const updatedPayments = payments.map(p => 
+            p.id === payment.id ? response.data.payment : p
+          );
+          setPayments(updatedPayments);
+          
           Alert.alert('Sucesso', response.data.message);
-          await loadPayments(); // Recarregar para pegar possíveis novos pagamentos criados
+          
+          // Recarregar para pegar possíveis novos pagamentos criados (em caso de pagamento parcial)
+          if (response.data.newPayment) {
+            await loadPayments();
+          }
         } else {
           throw new Error(response.message || 'Erro ao processar pagamento');
         }
@@ -560,7 +577,7 @@ const PaymentsScreen: React.FC = () => {
   // Função para calcular o status real do pagamento (incluindo atrasado)
   const getPaymentStatus = (payment: Payment): string => {
     if (payment.status === 'paid' || payment.status === 'failed') {
-      return payment.status;
+      return payment.status || 'pending';
     }
     
     // Se o status é 'pending', verificar se está atrasado
@@ -577,7 +594,7 @@ const PaymentsScreen: React.FC = () => {
       }
     }
     
-    return payment.status;
+    return payment.status || 'pending';
   };
 
   const renderStatusBadge = (payment: Payment) => {
@@ -638,6 +655,13 @@ const PaymentsScreen: React.FC = () => {
       width: isTablet ? 90 : 70,
       sortable: true,
       render: (payment: Payment) => formatCurrency(payment.amount || 0),
+    },
+    {
+      key: 'paid_amount',
+      title: 'V. Pago',
+      width: isTablet ? 90 : 70,
+      sortable: true,
+      render: (payment: Payment) => formatCurrency(payment.paid_amount || 0),
     },
     {
       key: 'due_date',

@@ -258,7 +258,7 @@ export class PaymentController {
   processManualPayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { amount, usePositiveBalance } = req.body;
+      const { amount, usePositiveBalance, paymentMethod } = req.body;
       
       if (!amount || amount <= 0) {
         res.status(400).json({
@@ -280,7 +280,8 @@ export class PaymentController {
       const result = await this.paymentService.processManualPayment(
         id, 
         amount, 
-        usePositiveBalance || 0
+        usePositiveBalance || 0,
+        paymentMethod
       );
       
       res.status(200).json({
