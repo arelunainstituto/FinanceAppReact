@@ -5,3 +5,4 @@
 DEPLOY-GUIDE.md
 deploy.sh
 backend/check-payment-methods.js
+backend/check-payment-methods.js

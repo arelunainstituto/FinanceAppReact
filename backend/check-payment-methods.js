@@ -1,4 +1,10 @@
-const { supabase } = require('./src/config/database.ts');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 async function checkPaymentMethods() {
   console.log('🔍 Verificando valores de payment_method no banco...');
@@ -30,7 +36,7 @@ async function checkPaymentMethods() {
   // Verificar se há métodos no banco que não estão no frontend
   const frontendMethods = [
     'DD', 'Stripe', 'Receção', 'TRF', 'PP', 'Cheque', 'Cheque/Misto',
-    'Aditamento', 'DD + TB', 'TRF ou RECEÇÃO', 'Ordenado', 'Numerário'
+    'Aditamento', 'DD + TB', 'TRF ou RECEÇÃO', 'Ordenado', 'Numerário', 'MB Way'
   ];
   
   const missingInFrontend = methods.filter(m => !frontendMethods.includes(m));

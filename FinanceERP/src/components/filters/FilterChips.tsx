@@ -58,6 +58,7 @@ const FilterChips: React.FC<FilterChipsProps> = ({
       'TRF ou RECEÇÃO': 'TRF ou RECEÇÃO',
       Ordenado: 'Ordenado',
       'Numerário': 'Numerário',
+      'MB Way': 'MB Way',
     };
     return methods[value] || value;
   };

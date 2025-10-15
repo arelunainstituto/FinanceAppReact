@@ -913,8 +913,8 @@ const PaymentsScreen: React.FC = () => {
           setShowManualPaymentModal(false);
           setSelectedPaymentForManual(null);
         }}
-        onConfirm={async (amount: number, usePositiveBalance?: number) => {
-          console.log('🔍 Confirmando pagamento manual:', { amount, usePositiveBalance });
+        onConfirm={async (amount: number, usePositiveBalance?: number, paymentMethod?: string) => {
+          console.log('🔍 Confirmando pagamento manual:', { amount, usePositiveBalance, paymentMethod });
           if (!selectedPaymentForManual) return;
 
           try {
@@ -923,7 +923,8 @@ const PaymentsScreen: React.FC = () => {
             const response = await ApiService.processManualPayment(
               selectedPaymentForManual.id, 
               amount, 
-              usePositiveBalance
+              usePositiveBalance,
+              paymentMethod
             );
             
             if (response.success) {
