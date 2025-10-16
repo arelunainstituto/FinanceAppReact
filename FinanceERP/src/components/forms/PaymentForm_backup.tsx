@@ -76,11 +76,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       if (payment.contract_id && contracts.length > 0) {
         const contract = contracts.find(c => c.id === payment.contract_id);
         setSelectedContract(contract || null);
-        
-        // Load contract balances for edit mode - CORREÇÃO APLICADA
-        if (contract) {
-          loadContractBalances(contract.id);
-        }
       }
     } else {
       // Reset form for new payment
@@ -96,7 +91,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         paid_amount: '',
       });
       setSelectedContract(null);
-      setContractBalances(null); // CORREÇÃO APLICADA
     }
     setErrors({});
   }, [payment, visible, contracts]);
@@ -111,6 +105,96 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       console.error('Error loading contracts:', error);
       Alert.alert('Erro', 'Não foi possível carregar os contratos');
     }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.contract_id) {
+      newErrors.contract_id = 'Contrato é obrigatório';
+    }
+
+    if (!formData.amount || isNaN(Number(formData.amount)) || Number(formData.amount) <= 0) {
+      newErrors.amount = 'Valor deve ser um número positivo';
+    }
+
+    if (!formData.due_date.trim()) {
+      newErrors.due_date = 'Data de vencimento é obrigatória';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Função para converter data DD/MM/YYYY para YYYY-MM-DD
+  const convertDateToISO = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    // Se já está no formato ISO (YYYY-MM-DD), retorna como está
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    // Se está no formato DD/MM/YYYY, converte para YYYY-MM-DD
+    const match = dateString.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (match) {
+      const [, day, month, year] = match;
+      return `${year}-${month}-${day}`;
+    }
+    
+    return dateString; // Retorna como está se não conseguir converter
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      Alert.alert('Erro', 'Por favor, corrija os erros no formulário');
+      return;
+    }
+
+    try {
+      const paymentData = {
+        ...formData,
+        amount: Number(formData.amount),
+        due_date: convertDateToISO(formData.due_date), // Converte para formato ISO
+        paid_date: formData.paid_date ? convertDateToISO(formData.paid_date) : undefined, // Converte para formato ISO se existir
+        payment_type: formData.payment_type || undefined, // Convert empty string to undefined
+        payment_method: formData.payment_method || undefined, // Convert empty string to undefined
+        notes: formData.notes || undefined, // Convert empty string to undefined
+        paid_amount: formData.paid_amount ? Number(formData.paid_amount) : undefined, // Convert to number if provided
+      };
+
+      await onSubmit(paymentData);
+      onClose();
+    } catch (error) {
+      Alert.alert('Erro', 'Falha ao salvar pagamento');
+    }
+  };
+
+  const updateField = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Se o status foi alterado para 'pending', limpar a data de pagamento
+      if (field === 'status' && value === 'pending') {
+        newData.paid_date = '';
+      }
+      
+      return newData;
+    });
+    
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleContractSelect = async (contract: Contract) => {
+    setSelectedContract(contract);
+    updateField('contract_id', contract.id);
+    setShowContractPicker(false);
+    
+    // Buscar saldos do contrato selecionado
+    await loadContractBalances(contract.id);
   };
 
   const loadContractBalances = async (contractId: string) => {
@@ -133,100 +217,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     } finally {
       setLoadingBalances(false);
     }
-  };
-
-  const handleContractSelect = async (contract: Contract) => {
-    setSelectedContract(contract);
-    updateField('contract_id', contract.id);
-    setShowContractPicker(false);
-    
-    // Buscar saldos do contrato selecionado
-    await loadContractBalances(contract.id);
-  };
-
-  const updateField = (field: string, value: string) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
-      // Automatic status update logic
-      if (field === 'paid_amount') {
-        const paidAmount = Number(value);
-        const totalAmount = Number(newData.amount);
-        
-        // If paid amount equals total amount, automatically set status to 'paid'
-        if (paidAmount > 0 && paidAmount === totalAmount) {
-          newData.status = 'paid';
-          // Also set paid_date to today if not already set
-          if (!newData.paid_date) {
-            const today = new Date();
-            const day = today.getDate().toString().padStart(2, '0');
-            const month = (today.getMonth() + 1).toString().padStart(2, '0');
-            const year = today.getFullYear();
-            newData.paid_date = `${day}/${month}/${year}`;
-          }
-        }
-        // If paid amount is less than total amount and greater than 0, set to 'partial'
-        else if (paidAmount > 0 && paidAmount < totalAmount) {
-          newData.status = 'partial';
-        }
-        // If paid amount is 0 or empty, set back to 'pending'
-        else if (paidAmount === 0 || !value) {
-          newData.status = 'pending';
-          newData.paid_date = '';
-        }
-      }
-      
-      // If status is changed to 'pending', clear paid_date and paid_amount
-      if (field === 'status' && value === 'pending') {
-        newData.paid_date = '';
-        newData.paid_amount = '';
-      }
-      
-      return newData;
-    });
-    
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.contract_id) {
-      newErrors.contract_id = 'Contrato é obrigatório';
-    }
-
-    if (!formData.amount) {
-      newErrors.amount = 'Valor é obrigatório';
-    } else if (isNaN(Number(formData.amount)) || Number(formData.amount) <= 0) {
-      newErrors.amount = 'Valor deve ser um número positivo';
-    }
-
-    if (!formData.due_date) {
-      newErrors.due_date = 'Data de vencimento é obrigatória';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    const paymentData = {
-      contract_id: formData.contract_id,
-      amount: Number(formData.amount),
-      due_date: formData.due_date,
-      paid_date: formData.paid_date || undefined,
-      status: formData.status as 'pending' | 'paid' | 'overdue' | 'partial',
-      payment_method: formData.payment_method || undefined,
-      notes: formData.notes || undefined,
-      payment_type: formData.payment_type as 'normalPayment' | 'manualPayment',
-      paid_amount: formData.paid_amount ? Number(formData.paid_amount) : undefined,
-    };
-
-    await onSubmit(paymentData);
   };
 
   const renderContractPicker = () => (
@@ -272,8 +262,31 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const statusOptions = [
     { value: 'pending', label: 'Pendente' },
     { value: 'paid', label: 'Pago' },
-    { value: 'overdue', label: 'Vencido' },
-    { value: 'partial', label: 'Parcial' },
+    { value: 'overdue', label: 'Atrasado' },
+    { value: 'failed', label: 'Falhou' },
+  ];
+
+  const paymentTypeOptions = [
+    { value: 'normalPayment', label: 'Pagamento Normal' },
+    { value: 'downPayment', label: 'Entrada' },
+  ];
+
+  const paymentMethodOptions = [
+    { value: 'DD', label: 'DD' },
+    { value: 'TRF', label: 'Transferência' },
+    { value: 'Stripe', label: 'Stripe' },
+    { value: 'PP', label: 'PP' },
+    { value: 'Receção', label: 'Receção' },
+    { value: 'TRF ou RECEÇÃO', label: 'TRF ou Receção' },
+    { value: 'TRF - OP', label: 'TRF - OP' },
+    { value: 'bank_transfer', label: 'Transferência Bancária' },
+    { value: 'Cheque', label: 'Cheque' },
+    { value: 'Cheque/Misto', label: 'Cheque/Misto' },
+    { value: 'Aditamento', label: 'Aditamento' },
+    { value: 'DD + TB', label: 'DD + TB' },
+    { value: 'Ordenado', label: 'Ordenado' },
+    { value: 'Numerário', label: 'Numerário' },
+    { value: 'MB Way', label: 'MB Way' },
   ];
 
   return (
@@ -288,12 +301,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <Text style={styles.title}>
             {payment ? 'Editar Pagamento' : 'Novo Pagamento'}
           </Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="#64748B" />
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.scrollView}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.form}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Informações Básicas</Text>
@@ -368,6 +381,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 onDateChange={(value) => updateField('due_date', value)}
                 error={errors.due_date}
                 placeholder="DD/MM/AAAA"
+                mode="date"
               />
 
               <DatePicker
@@ -375,11 +389,22 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={formData.paid_date}
                 onDateChange={(value) => updateField('paid_date', value)}
                 placeholder="DD/MM/AAAA"
+                mode="date"
+              />
+
+              <Input
+                label="Valor Pago"
+                value={formData.paid_amount}
+                onChangeText={(value) => updateField('paid_amount', value)}
+                placeholder="0,00"
+                keyboardType="numeric"
+                editable={formData.status !== 'pending'}
+                style={formData.status === 'pending' ? styles.disabledInput : undefined}
               />
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Status e Detalhes</Text>
+              <Text style={styles.sectionTitle}>Detalhes do Pagamento</Text>
               
               <View>
                 <Text style={styles.inputLabel}>Status</Text>
@@ -404,30 +429,64 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 </View>
               </View>
 
-              <Input
-                label="Método de Pagamento"
-                value={formData.payment_method}
-                onChangeText={(value) => updateField('payment_method', value)}
-                placeholder="Ex: PIX, Cartão, Dinheiro"
-              />
+              <View>
+                <Text style={styles.inputLabel}>Método de Pagamento</Text>
+                <View style={styles.statusContainer}>
+                  {paymentMethodOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.statusOption,
+                        formData.payment_method === option.value && styles.statusOptionSelected
+                      ]}
+                      onPress={() => updateField('payment_method', option.value)}
+                    >
+                      <Text style={[
+                        styles.statusOptionText,
+                        formData.payment_method === option.value && styles.statusOptionTextSelected
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-              <Input
-                label="Valor Pago"
-                value={formData.paid_amount}
-                onChangeText={(value) => updateField('paid_amount', value)}
-                placeholder="0,00"
-                keyboardType="numeric"
-                editable={formData.status !== 'pending'}
-                style={formData.status === 'pending' ? styles.disabledInput : undefined}
-              />
+              <View>
+                <Text style={styles.inputLabel}>Tipo de Pagamento</Text>
+                <View style={styles.statusContainer}>
+                  {paymentTypeOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.statusOption,
+                        formData.payment_type === option.value && styles.statusOptionSelected
+                      ]}
+                      onPress={() => updateField('payment_type', option.value)}
+                    >
+                      <Text style={[
+                        styles.statusOptionText,
+                        formData.payment_type === option.value && styles.statusOptionTextSelected
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
 
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Observações</Text>
+              
               <Input
                 label="Observações"
+                placeholder="Introduza observações adicionais"
                 value={formData.notes}
-                onChangeText={(value) => updateField('notes', value)}
-                placeholder="Observações adicionais"
+                onChangeText={(text) => setFormData({ ...formData, notes: text })}
                 multiline
                 numberOfLines={3}
+                error={errors.notes}
               />
             </View>
           </View>
@@ -441,15 +500,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             style={styles.cancelButton}
           />
           <Button
-            title={payment ? 'Salvar' : 'Criar'}
+            title={payment ? 'Actualizar' : 'Criar Pagamento'}
             onPress={handleSubmit}
             disabled={isLoading}
             style={styles.submitButton}
           />
         </View>
-
-        {renderContractPicker()}
       </View>
+
+      {renderContractPicker()}
     </Modal>
   );
 };

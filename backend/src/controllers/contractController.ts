@@ -194,4 +194,19 @@ export class ContractController {
       next(error);
     }
   };
+
+  getContractBalances = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const balances = await this.contractService.getContractBalances(id);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Contract balances retrieved successfully',
+        data: balances,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
