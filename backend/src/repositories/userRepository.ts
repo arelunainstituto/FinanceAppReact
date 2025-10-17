@@ -1,6 +1,7 @@
 import { supabase } from '../config/database';
 import { User } from '../models';
 import bcrypt from 'bcryptjs';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export class UserRepository {
   async findByEmail(email: string): Promise<User | null> {
@@ -10,7 +11,7 @@ export class UserRepository {
       
       if (error) throw error;
       
-      const user = users.find(u => u.email === email);
+      const user = users.find((u: SupabaseUser) => u.email === email);
       
       if (!user) return null;
       
@@ -130,7 +131,7 @@ export class UserRepository {
       
       if (error) throw error;
       
-      return users.some(u => u.email === email);
+      return users.some((u: SupabaseUser) => u.email === email);
     } catch (error) {
       console.error('Error checking email existence:', error);
       return false;

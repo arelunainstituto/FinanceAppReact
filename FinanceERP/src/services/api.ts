@@ -1,15 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '../types';
 
-// API Configuration - Use local backend in development
+// API Configuration - Dynamic URL based on current domain
 const getApiBaseUrl = () => {
   // Use environment variable if available
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
-  // Use local backend for development
-  return 'http://localhost:3000/api';
+  // For web deployment, use same domain as frontend
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api`;
+  }
+  
+  // Fallback for server-side rendering or React Native - use fixed domain
+  return 'https://financeiro.institutoareluna.pt/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
