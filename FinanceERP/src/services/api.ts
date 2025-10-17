@@ -3,17 +3,26 @@ import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '..
 
 // API Configuration - Dynamic URL based on current domain
 const getApiBaseUrl = () => {
-  // Use environment variable if available
+  // Use environment variable if available (prioritize for development)
   if (process.env.REACT_APP_API_BASE_URL) {
+    console.log('🌐 Using API URL from environment:', process.env.REACT_APP_API_BASE_URL);
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
-  // For web deployment, use same domain as frontend
-  if (typeof window !== 'undefined') {
+  // For web deployment, use same domain as frontend (only in production)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    console.log('🌐 Using production API URL:', `${window.location.origin}/api`);
     return `${window.location.origin}/api`;
   }
   
+  // Development fallback - use localhost backend
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('🌐 Using development fallback API URL: http://localhost:3000/api');
+    return 'http://localhost:3000/api';
+  }
+  
   // Fallback for server-side rendering or React Native - use fixed domain
+  console.log('🌐 Using production fallback API URL: https://financeiro.institutoareluna.pt/api');
   return 'https://financeiro.institutoareluna.pt/api';
 };
 
