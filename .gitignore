@@ -8,3 +8,15 @@ backend/check-payment-methods.js
 backend/check-payment-methods.js
 .DS_Store
 db_backup/db_cluster-17-10-2025@01-03-28.backup.gz
+
+# Environment variables - Local development
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+
+# Keep production env files for deployment
+!.env.production
+!.env.vercel.production
