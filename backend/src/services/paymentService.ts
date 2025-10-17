@@ -17,6 +17,10 @@ export class PaymentService {
     return this.paymentRepository.findAll();
   }
 
+  async getAllPaymentsForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
+    return this.paymentRepository.findAllForExport(filters);
+  }
+
   async getAllPaymentsPaginated(options: PaginationOptions = {}, filters: PaymentFilters = {}): Promise<PaginatedResult<Payment>> {
     return this.paymentRepository.findAllPaginated(options, filters);
   }

@@ -68,6 +68,165 @@ export class PaymentRepository {
     }
   }
 
+  async findAllForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
+    try {
+      const { 
+        status, 
+        search, 
+        contractId,
+        due_date_from,
+        due_date_to,
+        paid_date_from,
+        paid_date_to,
+        created_at_from,
+        created_at_to,
+        amount_min,
+        amount_max,
+        payment_method,
+        payment_type,
+        contract_number,
+        contract_status,
+        client_name,
+        client_email,
+        client_phone,
+        tax_id
+      } = filters;
+
+      // Query direta sem paginação para exportação
+      let query = supabase
+        .from('payments')
+        .select(`
+          *,
+          contract:contracts(
+            *,
+            client:clients(*)
+          )
+        `);
+
+      // Aplicar filtros de pagamento
+      if (status) {
+        if (status === 'pending') {
+          const today = new Date().toISOString().split('T')[0];
+          query = query.eq('status', status).gte('due_date', today);
+        } else if (status === 'overdue') {
+          const today = new Date().toISOString().split('T')[0];
+          query = query.eq('status', 'pending').lt('due_date', today);
+        } else {
+          query = query.eq('status', status);
+        }
+      }
+
+      if (contractId) {
+        query = query.eq('contract_id', contractId);
+      }
+
+      // Filtros de data
+      if (due_date_from) {
+        query = query.gte('due_date', due_date_from);
+      }
+      if (due_date_to) {
+        query = query.lte('due_date', due_date_to);
+      }
+      if (paid_date_from) {
+        query = query.gte('paid_date', paid_date_from);
+      }
+      if (paid_date_to) {
+        query = query.lte('paid_date', paid_date_to);
+      }
+      if (created_at_from) {
+        query = query.gte('created_at', created_at_from);
+      }
+      if (created_at_to) {
+        query = query.lte('created_at', created_at_to);
+      }
+
+      // Filtros de valor
+      if (amount_min !== undefined) {
+        query = query.gte('amount', amount_min);
+      }
+      if (amount_max !== undefined) {
+        query = query.lte('amount', amount_max);
+      }
+
+      // Filtros de método e tipo de pagamento
+      if (payment_method) {
+        query = query.eq('payment_method', payment_method);
+      }
+      if (payment_type) {
+        query = query.eq('payment_type', payment_type);
+      }
+
+      // Filtros de contrato
+      if (contract_number) {
+        query = query.eq('contracts.contract_number', contract_number);
+      }
+      if (contract_status) {
+        query = query.eq('contracts.status', contract_status);
+      }
+
+      // Filtros de cliente
+      if (client_name) {
+        query = query.or(`contracts.clients.first_name.ilike.%${client_name}%,contracts.clients.last_name.ilike.%${client_name}%`);
+      }
+      if (client_email) {
+        query = query.ilike('contracts.clients.email', `%${client_email}%`);
+      }
+      if (client_phone) {
+        query = query.ilike('contracts.clients.phone', `%${client_phone}%`);
+      }
+      if (tax_id) {
+        query = query.eq('contracts.clients.tax_id', tax_id);
+      }
+
+      // Busca geral
+      if (search) {
+        const searchTerm = search.trim();
+        const numericValue = parseFloat(searchTerm);
+        const isNumeric = !isNaN(numericValue) && isFinite(numericValue);
+        
+        let searchConditions = [
+          `notes.ilike.%${searchTerm}%`,
+          `contracts.contract_number.ilike.%${searchTerm}%`,
+          `contracts.clients.first_name.ilike.%${searchTerm}%`,
+          `contracts.clients.last_name.ilike.%${searchTerm}%`
+        ];
+
+        if (isNumeric && numericValue > 0) {
+          searchConditions.push(`amount.eq.${numericValue}`);
+        }
+
+        query = query.or(searchConditions.join(','));
+      }
+
+      // Implementar paginação interna para contornar o limite de 1000 registros do Supabase
+      const batchSize = 1000;
+      let allPayments: Payment[] = [];
+      let offset = 0;
+      let hasMoreData = true;
+
+      while (hasMoreData) {
+        const { data, error } = await query
+          .order('created_at', { ascending: false })
+          .range(offset, offset + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allPayments = allPayments.concat(data);
+          offset += batchSize;
+          hasMoreData = data.length === batchSize;
+        } else {
+          hasMoreData = false;
+        }
+      }
+
+      return allPayments;
+    } catch (error) {
+      console.error('Error fetching all payments for export:', error);
+      throw new Error('Failed to fetch payments for export');
+    }
+  }
+
   async findAllPaginated(options: PaginationOptions = {}, filters: PaymentFilters = {}): Promise<PaginatedResult<Payment>> {
     try {
       const { page = 1, limit = 50 } = options;
@@ -108,9 +267,9 @@ export class PaymentRepository {
           .from('payments')
           .select(`
             *,
-            contract:contracts!inner(
+            contract:contracts(
               *,
-              client:clients!inner(*)
+              client:clients(*)
             )
           `, { count: 'exact', head: true })
           .eq('status', 'pending')
@@ -121,9 +280,9 @@ export class PaymentRepository {
           .from('payments')
           .select(`
             *,
-            contract:contracts!inner(
+            contract:contracts(
               *,
-              client:clients!inner(*)
+              client:clients(*)
             )
           `)
           .eq('status', 'pending')
@@ -242,24 +401,24 @@ export class PaymentRepository {
 
       // Construir query base com joins para permitir filtros cruzados
       let countQuery = supabase
-        .from('payments')
-        .select(`
-          *,
-          contract:contracts!inner(
+          .from('payments')
+          .select(`
             *,
-            client:clients!inner(*)
-          )
-        `, { count: 'exact', head: true });
-      
-      let dataQuery = supabase
-        .from('payments')
-        .select(`
-          *,
-          contract:contracts!inner(
+            contract:contracts(
+              *,
+              client:clients(*)
+            )
+          `, { count: 'exact', head: true });
+
+        let dataQuery = supabase
+          .from('payments')
+          .select(`
             *,
-            client:clients!inner(*)
-          )
-        `);
+            contract:contracts(
+              *,
+              client:clients(*)
+            )
+          `);
 
       // Aplicar filtros de pagamento
       if (status) {
@@ -374,9 +533,9 @@ export class PaymentRepository {
              .from('payments')
              .select(`
                *,
-               contract:contracts!inner(
+               contract:contracts(
                  *,
-                 client:clients!inner(*)
+                 client:clients(*)
                )
              `)
              .ilike('notes', `%${searchTerm}%`)
@@ -388,9 +547,9 @@ export class PaymentRepository {
              .from('payments')
              .select(`
                *,
-               contract:contracts!inner(
+               contract:contracts(
                  *,
-                 client:clients!inner(*)
+                 client:clients(*)
                )
              `)
              .ilike('contracts.contract_number', `%${searchTerm}%`)
@@ -402,9 +561,9 @@ export class PaymentRepository {
              .from('payments')
              .select(`
                *,
-               contract:contracts!inner(
+               contract:contracts(
                  *,
-                 client:clients!inner(*)
+                 client:clients(*)
                )
              `)
              .ilike('contracts.clients.first_name', `%${searchTerm}%`)
@@ -416,9 +575,9 @@ export class PaymentRepository {
              .from('payments')
              .select(`
                *,
-               contract:contracts!inner(
+               contract:contracts(
                  *,
-                 client:clients!inner(*)
+                 client:clients(*)
                )
              `)
              .ilike('contracts.clients.last_name', `%${searchTerm}%`)
@@ -431,9 +590,9 @@ export class PaymentRepository {
                .from('payments')
                .select(`
                  *,
-                 contract:contracts!inner(
+                 contract:contracts(
                    *,
-                   client:clients!inner(*)
+                   client:clients(*)
                  )
                `)
                .eq('amount', numericValue)
@@ -553,9 +712,9 @@ export class PaymentRepository {
         .from('payments')
         .select(`
           *,
-          contract:contracts!inner(
+          contract:contracts(
             *,
-            client:clients!inner(*)
+            client:clients(*)
           )
         `)
         .ilike('contracts.clients.first_name', searchTerm)
@@ -566,9 +725,9 @@ export class PaymentRepository {
         .from('payments')
         .select(`
           *,
-          contract:contracts!inner(
+          contract:contracts(
             *,
-            client:clients!inner(*)
+            client:clients(*)
           )
         `)
         .ilike('contracts.clients.last_name', searchTerm)
@@ -670,16 +829,16 @@ export class PaymentRepository {
   async findById(id: string): Promise<Payment | null> {
     try {
       const { data, error } = await supabase
-        .from('payments')
-        .select(`
-          *,
-          contract:contracts(
+          .from('payments')
+          .select(`
             *,
-            client:clients(*)
-          )
-        `)
-        .eq('id', id)
-        .single();
+            contract:contracts(
+              *,
+              client:clients(*)
+            )
+          `)
+          .eq('id', id)
+          .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       return data || null;

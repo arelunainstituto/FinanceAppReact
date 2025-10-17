@@ -14,6 +14,14 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'Authorization': `Bearer ${supabaseKey}`
+    }
   }
 });
 
