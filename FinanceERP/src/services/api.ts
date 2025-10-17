@@ -223,6 +223,25 @@ class ApiService {
     return this.request(url);
   }
 
+  async getPaymentsForExport(filters?: Record<string, any>): Promise<ApiResponse<Payment[]>> {
+    let url = '/payments/export';
+    
+    if (filters) {
+      const params = new URLSearchParams();
+      Object.keys(filters).forEach(key => {
+        if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+          params.append(key, filters[key].toString());
+        }
+      });
+      const queryString = params.toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+    }
+    
+    return this.request(url);
+  }
+
   async getPayment(id: string): Promise<ApiResponse<Payment>> {
     return this.request(`/payments/${id}`);
   }

@@ -14,13 +14,18 @@ async function testAuth() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: 'test@example.com',
-        password: '123456'
+        email: 'admin@example.com',
+        password: 'admin123'
       })
     });
 
     const loginData = await loginResponse.json();
-    console.log('✅ Login realizado:', loginData.message);
+    console.log('✅ Login response:', JSON.stringify(loginData, null, 2));
+    
+    if (!loginData.data || !loginData.data.token) {
+      console.error('❌ Erro: Token não encontrado na resposta');
+      return;
+    }
     
     const token = loginData.data.token;
     console.log('🎫 Token obtido:', token.substring(0, 50) + '...');

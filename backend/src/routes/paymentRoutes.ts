@@ -17,7 +17,9 @@ router.get('/overdue/list', paymentController.getOverduePayments);
 router.get('/statistics/summary', paymentController.getPaymentStatistics);
 
 // Generic routes last
-router.get('/', paymentController.getAllPayments);
+router.get('/', paymentController.getAllPaymentsPaginated);
+router.get('/all', paymentController.getAllPayments);
+router.get('/export', paymentController.getAllPaymentsForExport);
 router.get('/:id', paymentController.getPaymentById);
 router.post('/', paymentController.createPayment);
 router.put('/:id', paymentController.updatePayment);

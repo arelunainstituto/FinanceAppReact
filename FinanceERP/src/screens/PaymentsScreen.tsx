@@ -26,6 +26,7 @@ import FilterChips from '../components/filters/FilterChips';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportPaymentsToCSV } from '../utils/csvExport';
+import ExportConfirmModal from '../components/common/ExportConfirmModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
@@ -76,6 +77,10 @@ const PaymentsScreen: React.FC = () => {
   // Manual payment modal state
   const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
   const [selectedPaymentForManual, setSelectedPaymentForManual] = useState<Payment | null>(null);
+
+  // Export confirmation modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -355,11 +360,19 @@ const PaymentsScreen: React.FC = () => {
   };
 
   const handleExportCSV = async () => {
+    if (totalItems === 0) {
+      Alert.alert('Aviso', 'Não há dados de pagamentos para exportar.');
+      return;
+    }
+
+    // Show confirmation modal
+    setShowExportModal(true);
+  };
+
+  const handleConfirmExport = async () => {
     try {
-      if (totalItems === 0) {
-        Alert.alert('Aviso', 'Não há dados de pagamentos para exportar.');
-        return;
-      }
+      setIsExporting(true);
+      setShowExportModal(false);
 
       // Preparar filtros para buscar todos os dados
       const filters: any = {};
@@ -394,48 +407,21 @@ const PaymentsScreen: React.FC = () => {
       // Convert date filters to API format
       const filtersWithConvertedDates = convertDateFiltersToApiFormat(filters);
 
-      // Buscar todos os pagamentos filtrados (sem paginação)
-      let allPayments: Payment[] = [];
+      // Usar o novo endpoint de exportação sem limite
+      const response = await ApiService.getPaymentsForExport(filtersWithConvertedDates);
       
-      if (contractId) {
-        // Para contrato específico, buscar todos os pagamentos
-        const response = await ApiService.getPaymentsByContractPaginated(
-          contractId, 
-          1, 
-          totalItems, // Buscar todos os itens de uma vez
-          filtersWithConvertedDates
-        );
+      if (response.success && response.data) {
+        exportPaymentsToCSV(response.data);
         
-        if (response.success && response.data) {
-          allPayments = response.data.data;
-        }
+        Alert.alert('Sucesso', `Arquivo CSV exportado com sucesso! (${response.data.length} registros)`);
       } else {
-        // Para todos os pagamentos, buscar todos
-        const response = await ApiService.getPaymentsPaginated(
-          1, 
-          totalItems, // Buscar todos os itens de uma vez
-          filtersWithConvertedDates
-        );
-        
-        if (response.success && response.data) {
-          allPayments = response.data.data;
-        }
+        throw new Error('Falha ao exportar dados');
       }
-
-      if (allPayments.length === 0) {
-        Alert.alert('Aviso', 'Não foi possível obter os dados para exportação.');
-        return;
-      }
-
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      const filename = `pagamentos_${timestamp}`;
-      
-      exportPaymentsToCSV(allPayments);
-      
-      Alert.alert('Sucesso', `Arquivo CSV exportado com sucesso! (${allPayments.length} registros)`);
     } catch (error) {
       console.error('Erro ao exportar CSV:', error);
       Alert.alert('Erro', 'Falha ao exportar dados para CSV.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -984,6 +970,14 @@ const PaymentsScreen: React.FC = () => {
             setIsLoading(false);
           }
         }}
+      />
+
+      <ExportConfirmModal
+        visible={showExportModal}
+        totalRecords={totalItems}
+        onConfirm={handleConfirmExport}
+        onClose={() => setShowExportModal(false)}
+        isLoading={isExporting}
       />
     </MainLayout>
   );
