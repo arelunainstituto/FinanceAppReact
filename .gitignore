@@ -20,3 +20,4 @@ db_backup/db_cluster-17-10-2025@01-03-28.backup.gz
 # Keep production env files for deployment
 !.env.production
 !.env.vercel.production
+test-auth.js
