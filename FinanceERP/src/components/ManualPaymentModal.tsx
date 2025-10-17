@@ -103,11 +103,17 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
   console.log('🔍 ManualPaymentModal vai renderizar Modal com:', { visible, title: 'Pagamento Manual' });
 
   const handleSubmit = async () => {
+    // Validate payment amount first
+    if (!paymentAmount || paymentAmount.trim() === '') {
+      Alert.alert('Erro', 'Por favor, insira um valor para o pagamento');
+      return;
+    }
+    
     const amount = parseFloat(paymentAmount);
     const positiveBalanceToUse = parseFloat(usePositiveBalance) || 0;
     
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Erro', 'Por favor, insira um valor válido');
+      Alert.alert('Erro', 'Por favor, insira um valor válido maior que zero');
       return;
     }
 

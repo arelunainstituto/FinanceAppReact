@@ -6,3 +6,5 @@ DEPLOY-GUIDE.md
 deploy.sh
 backend/check-payment-methods.js
 backend/check-payment-methods.js
+.DS_Store
+db_backup/db_cluster-17-10-2025@01-03-28.backup.gz

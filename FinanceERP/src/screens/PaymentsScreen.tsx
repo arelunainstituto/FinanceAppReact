@@ -528,6 +528,13 @@ const PaymentsScreen: React.FC = () => {
 
   const handleTogglePaymentStatus = async (payment: Payment) => {
     try {
+      console.log('🔍 handleTogglePaymentStatus called with payment:', {
+        id: payment.id,
+        amount: payment.amount,
+        status: payment.status,
+        fullPayment: payment
+      });
+
       if (payment.status === 'paid') {
         // Se está pago, apenas marcar como pendente
         const updateData = { 
@@ -548,8 +555,18 @@ const PaymentsScreen: React.FC = () => {
           throw new Error('Failed to update payment');
         }
       } else {
+        // Verificar se o amount é válido antes de enviar
+        const amountToSend = payment.amount || 0;
+        console.log('💰 Amount to send:', amountToSend);
+        
+        if (amountToSend <= 0) {
+          console.error('❌ Invalid payment amount:', amountToSend);
+          Alert.alert('Erro', 'O valor do pagamento deve ser maior que zero');
+          return;
+        }
+
         // Se não está pago, usar a lógica de pagamento manual com valor total
-        const response = await ApiService.processManualPayment(payment.id, payment.amount);
+        const response = await ApiService.processManualPayment(payment.id, amountToSend);
         
         if (response.success && response.data) {
           // Atualizar o estado local imediatamente com o pagamento atualizado

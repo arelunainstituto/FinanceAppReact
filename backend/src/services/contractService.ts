@@ -314,28 +314,33 @@ export class ContractService {
    */
   async deleteContractPayments(contractId: string): Promise<void> {
     try {
-      // Verificar se o contrato existe
+      // First check if contract exists
       const contract = await this.contractRepository.findById(contractId);
       if (!contract) {
         throw createError('Contract not found', 404);
       }
 
-      // Verificar se existem pagamentos para este contrato
-      const existingPayments = await this.paymentRepository.findByContractId(contractId);
-      if (existingPayments.length === 0) {
-        console.log(`No payments found for contract ${contractId}`);
-        return;
-      }
-
-      // Remover todos os pagamentos do contrato
-      const success = await this.paymentRepository.deleteByContractId(contractId);
-      if (!success) {
-        throw createError('Failed to delete contract payments', 500);
-      }
-
-      console.log(`Successfully deleted ${existingPayments.length} payments for contract ${contractId}`);
+      // Delete all payments for this contract
+      await this.paymentRepository.deleteByContractId(contractId);
     } catch (error) {
       console.error('Error deleting contract payments:', error);
+      throw error;
+    }
+  }
+
+  async getContractBalances(contractId: string): Promise<{ positive_balance: number; negative_balance: number }> {
+    try {
+      const contract = await this.contractRepository.findById(contractId);
+      if (!contract) {
+        throw createError('Contract not found', 404);
+      }
+
+      return {
+        positive_balance: contract.positive_balance || 0,
+        negative_balance: contract.negative_balance || 0
+      };
+    } catch (error) {
+      console.error('Error fetching contract balances:', error);
       throw error;
     }
   }

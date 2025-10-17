@@ -257,10 +257,14 @@ export class PaymentController {
 
   processManualPayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log('🔄 processManualPayment called');
       const { id } = req.params;
       const { amount, usePositiveBalance, paymentMethod } = req.body;
       
+      console.log('📋 Request params:', { id, amount, usePositiveBalance, paymentMethod });
+      
       if (!amount || amount <= 0) {
+        console.log('❌ Invalid amount:', amount);
         res.status(400).json({
           success: false,
           message: 'Amount must be a positive number',
@@ -270,6 +274,7 @@ export class PaymentController {
 
       // Validar usePositiveBalance se fornecido
       if (usePositiveBalance !== undefined && usePositiveBalance < 0) {
+        console.log('❌ Invalid usePositiveBalance:', usePositiveBalance);
         res.status(400).json({
           success: false,
           message: 'Positive balance usage cannot be negative',
@@ -277,6 +282,7 @@ export class PaymentController {
         return;
       }
 
+      console.log('🚀 Calling paymentService.processManualPayment...');
       const result = await this.paymentService.processManualPayment(
         id, 
         amount, 
@@ -284,12 +290,18 @@ export class PaymentController {
         paymentMethod
       );
       
+      console.log('✅ Payment service result:', result);
+      console.log('📤 Sending response with status 200');
+      
       res.status(200).json({
         success: true,
         message: result.message,
         data: result,
       });
+      
+      console.log('✅ Response sent successfully');
     } catch (error) {
+      console.log('❌ Error in processManualPayment:', error);
       next(error);
     }
   };

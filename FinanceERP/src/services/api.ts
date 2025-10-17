@@ -158,6 +158,10 @@ class ApiService {
     return this.request<Contract[]>(`/contracts/client/${clientId}`);
   }
 
+  async getContractBalances(id: string): Promise<ApiResponse<{ positive_balance: number; negative_balance: number }>> {
+    return this.request<{ positive_balance: number; negative_balance: number }>(`/contracts/${id}/balances`);
+  }
+
   async createContract(contract: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Contract>> {
     return this.request('/contracts', {
       method: 'POST',
