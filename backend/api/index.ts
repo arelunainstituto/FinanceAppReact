@@ -28,10 +28,14 @@ app.use(cors({
     'http://127.0.0.1:8081',
     'http://127.0.0.1:3000',
     'https://financeapp-areluna.vercel.app',
+    'https://financeapp-cak7jo921-areluna.vercel.app',
+    'https://financeiro.institutoareluna.pt',
     process.env.FRONTEND_URL || 'https://financeapp-areluna.vercel.app',
     ...(process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [])
   ].filter(Boolean),
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Body parsing middleware
