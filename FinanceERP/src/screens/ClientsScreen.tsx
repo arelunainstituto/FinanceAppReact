@@ -20,12 +20,13 @@ import DataTable, { DataTableColumn } from '../components/DataTable';
 import ClientForm from '../components/forms/ClientForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ClientAdvancedFilters from '../components/filters/ClientAdvancedFilters';
+import PaginationControls from '../components/common/PaginationControls';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportClientsToCSV } from '../utils/csvExport';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
-const ITEMS_PER_PAGE = isTablet ? 10 : 8;
+const DEFAULT_ITEMS_PER_PAGE = isTablet ? 10 : 8;
 
 type ClientsScreenNavigationProp = StackNavigationProp<MainStackParamList, 'Clients'>;
 
@@ -38,6 +39,7 @@ const ClientsScreen: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   
   // Form states
   const [showClientForm, setShowClientForm] = useState(false);
@@ -58,8 +60,8 @@ const ClientsScreen: React.FC = () => {
 
   // Calculate total pages using useMemo to avoid unnecessary recalculations
   const totalPages = useMemo(() => {
-    return Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
-  }, [filteredClients.length]);
+    return Math.ceil(filteredClients.length / itemsPerPage);
+  }, [filteredClients.length, itemsPerPage]);
 
   // Reset to first page if current page exceeds total pages
   useEffect(() => {
@@ -303,8 +305,8 @@ const ClientsScreen: React.FC = () => {
 
   // Pagination functions
   const getCurrentPageData = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     return filteredClients.slice(startIndex, endIndex);
   };
 
@@ -324,6 +326,11 @@ const ClientsScreen: React.FC = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   const renderPaginationControls = () => {
@@ -347,7 +354,7 @@ const ClientsScreen: React.FC = () => {
       <View style={styles.paginationContainer}>
         <View style={styles.paginationInfo}>
           <Text style={styles.paginationText}>
-            Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)} de {filteredClients.length} clientes
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} clientes
           </Text>
         </View>
         
@@ -544,7 +551,16 @@ const ClientsScreen: React.FC = () => {
             keyExtractor={(item) => item.id}
           />
 
-          {renderPaginationControls()}
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredClients.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={goToPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            itemType="clientes"
+            rowCountOptions={[5, 8, 10, 15, 20]}
+          />
         </View>
       </ScrollView>
 
