@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from './common/Modal';
 import { formatCurrency } from '../utils/currency';
+import { formatNumberInput } from '../utils/numberFormat';
 
 interface ManualPaymentModalProps {
   visible: boolean;
@@ -279,9 +280,9 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
             <Text style={styles.currencySymbol}>€</Text>
             <TextInput
               value={paymentAmount}
-              onChangeText={setPaymentAmount}
-              placeholder="0,00"
-              keyboardType="numeric"
+              onChangeText={(text) => setPaymentAmount(formatNumberInput(text, 2))}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
               style={styles.enhancedInput}
             />
           </View>
@@ -292,9 +293,9 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
               <Text style={styles.currencySymbol}>€</Text>
               <TextInput
                 value={usePositiveBalance}
-                onChangeText={setUsePositiveBalance}
-                placeholder="0,00"
-                keyboardType="numeric"
+                onChangeText={(text) => setUsePositiveBalance(formatNumberInput(text, 2))}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
                 style={styles.enhancedInput}
               />
               <Text style={styles.balanceLabel}>do saldo positivo</Text>

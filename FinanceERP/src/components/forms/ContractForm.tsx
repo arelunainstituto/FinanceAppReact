@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Contract, Client } from '../../types';
 import Input from '../common/Input';
+import NumericInput from '../common/NumericInput';
 import Button from '../common/Button';
 import DatePicker from '../common/DatePicker';
 import ApiService from '../../services/api';
@@ -387,13 +388,13 @@ const ContractForm: React.FC<ContractFormProps> = ({
                 numberOfLines={3}
               />
 
-              <Input
+              <NumericInput
                 label="Valor Total *"
                 value={formData.value}
                 onChangeText={(value) => updateField('value', value)}
                 error={errors.value}
-                placeholder="0,00"
-                keyboardType="numeric"
+                placeholder="0.00"
+                maxDecimalPlaces={2}
               />
             </View>
 
@@ -428,21 +429,21 @@ const ContractForm: React.FC<ContractFormProps> = ({
                 placeholder="Ex: Mensal, Trimestral, etc."
               />
 
-              <Input
+              <NumericInput
                 label="Entrada"
-                placeholder="Introduza o valor da entrada"
+                placeholder="0.00"
                 value={formData.down_payment}
                 onChangeText={(text) => setFormData({ ...formData, down_payment: text })}
-                keyboardType="numeric"
+                maxDecimalPlaces={2}
                 error={errors.down_payment}
               />
 
-              <Input
+              <NumericInput
                 label="Número de Pagamentos"
-                placeholder="Introduza o número de pagamentos"
+                placeholder="Ex: 12"
                 value={formData.number_of_payments}
                 onChangeText={(text) => updateFieldWithEndDateCalculation('number_of_payments', text)}
-                keyboardType="numeric"
+                maxDecimalPlaces={0}
                 error={errors.number_of_payments}
               />
             </View>

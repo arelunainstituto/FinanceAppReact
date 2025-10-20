@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Payment, Contract } from '../../types';
 import Input from '../common/Input';
+import NumericInput from '../common/NumericInput';
 import Button from '../common/Button';
 import DatePicker from '../common/DatePicker';
 import ApiService from '../../services/api';
@@ -176,8 +177,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         }
       }
       
-      // If status is changed to 'pending', clear paid_date and paid_amount
-      if (field === 'status' && value === 'pending') {
+      // If status is changed to 'pending' or 'renegociado', clear paid_date and paid_amount
+      if (field === 'status' && (value === 'pending' || value === 'renegociado')) {
         newData.paid_date = '';
         newData.paid_amount = '';
       }
@@ -219,7 +220,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       amount: Number(formData.amount),
       due_date: formData.due_date,
       paid_date: formData.paid_date || undefined,
-      status: formData.status as 'pending' | 'paid' | 'overdue' | 'partial',
+      status: formData.status as 'pending' | 'paid' | 'overdue' | 'partial' | 'renegociado',
       payment_method: formData.payment_method || undefined,
       notes: formData.notes || undefined,
       payment_type: formData.payment_type as 'normalPayment' | 'manualPayment',
@@ -274,6 +275,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     { value: 'paid', label: 'Pago' },
     { value: 'overdue', label: 'Vencido' },
     { value: 'partial', label: 'Parcial' },
+    { value: 'renegociado', label: 'Renegociado' },
   ];
 
   return (
@@ -353,13 +355,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 </View>
               )}
 
-              <Input
+              <NumericInput
                 label="Valor *"
                 value={formData.amount}
                 onChangeText={(value) => updateField('amount', value)}
                 error={errors.amount}
-                placeholder="0,00"
-                keyboardType="numeric"
+                placeholder="0.00"
+                maxDecimalPlaces={2}
               />
 
               <DatePicker
@@ -411,14 +413,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 placeholder="Ex: PIX, Cartão, Dinheiro"
               />
 
-              <Input
+              <NumericInput
                 label="Valor Pago"
                 value={formData.paid_amount}
                 onChangeText={(value) => updateField('paid_amount', value)}
-                placeholder="0,00"
-                keyboardType="numeric"
-                editable={formData.status !== 'pending'}
-                style={formData.status === 'pending' ? styles.disabledInput : undefined}
+                placeholder="0.00"
+                maxDecimalPlaces={2}
+                editable={formData.status !== 'pending' && formData.status !== 'renegociado'}
+                style={(formData.status === 'pending' || formData.status === 'renegociado') ? styles.disabledInput : undefined}
               />
 
               <Input

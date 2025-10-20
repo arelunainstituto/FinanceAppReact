@@ -33,7 +33,7 @@ const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
 const DEFAULT_ITEMS_PER_PAGE = isTablet ? 10 : 8;
 
-type PaymentFilter = 'all' | 'pending' | 'paid' | 'overdue' | 'failed';
+type PaymentFilter = 'all' | 'pending' | 'paid' | 'overdue' | 'failed' | 'renegociado';
 type PaymentsScreenRouteProp = RouteProp<MainStackParamList, 'Payments'>;
 
 const filters = [
@@ -42,6 +42,7 @@ const filters = [
   { key: 'paid' as PaymentFilter, label: 'Pagos' },
   { key: 'overdue' as PaymentFilter, label: 'Atrasados' },
   { key: 'failed' as PaymentFilter, label: 'Falhou' },
+  { key: 'renegociado' as PaymentFilter, label: 'Renegociados' },
 ];
 
 const PaymentsScreen: React.FC = () => {
@@ -502,7 +503,7 @@ const PaymentsScreen: React.FC = () => {
 
   // Função para calcular o status real do pagamento (incluindo atrasado)
   const getPaymentStatus = (payment: Payment): string => {
-    if (payment.status === 'paid' || payment.status === 'failed') {
+    if (payment.status === 'paid' || payment.status === 'failed' || payment.status === 'renegociado') {
       return payment.status || 'pending';
     }
     
@@ -532,17 +533,20 @@ const PaymentsScreen: React.FC = () => {
         styles.statusBadge,
         realStatus === 'paid' ? styles.paidBadge : 
         realStatus === 'pending' ? styles.pendingBadge :
-        realStatus === 'overdue' ? styles.overdueBadge : styles.failedBadge
+        realStatus === 'overdue' ? styles.overdueBadge :
+        realStatus === 'renegociado' ? styles.renegociadoBadge : styles.failedBadge
       ]}>
         <Text style={[
           styles.statusText,
           { color: realStatus === 'paid' ? '#34C759' : 
                    realStatus === 'pending' ? '#FF9500' :
-                   realStatus === 'overdue' ? '#FF3B30' : '#8E8E93' }
+                   realStatus === 'overdue' ? '#FF3B30' :
+                   realStatus === 'renegociado' ? '#3B82F6' : '#8E8E93' }
         ]}>
           {realStatus === 'paid' ? 'Pago' : 
            realStatus === 'pending' ? 'Pendente' :
-           realStatus === 'overdue' ? 'Atrasado' : 'Cancelado'}
+           realStatus === 'overdue' ? 'Atrasado' :
+           realStatus === 'renegociado' ? 'Renegociado' : 'Cancelado'}
         </Text>
       </View>
     );
@@ -555,6 +559,7 @@ const PaymentsScreen: React.FC = () => {
       case 'paid': return 'Pagos';
       case 'overdue': return 'Atrasados';
       case 'failed': return 'Falhou';
+      case 'renegociado': return 'Renegociados';
       default: return filter;
     }
   };
@@ -655,12 +660,12 @@ const PaymentsScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.checkboxContainer}
           onPress={() => handleTogglePaymentStatus(payment)}
-          disabled={payment.status === 'failed'}
+          disabled={payment.status === 'failed' || payment.status === 'renegociado'}
         >
           <View style={[
             styles.checkbox,
             payment.status === 'paid' && styles.checkboxChecked,
-            payment.status === 'failed' && styles.checkboxDisabled,
+            (payment.status === 'failed' || payment.status === 'renegociado') && styles.checkboxDisabled,
           ]}>
             {payment.status === 'paid' && (
               <Ionicons name="checkmark" size={16} color="#FFFFFF" />
@@ -1021,6 +1026,9 @@ const styles = StyleSheet.create({
   },
   failedBadge: {
     backgroundColor: '#F1F5F9',
+  },
+  renegociadoBadge: {
+    backgroundColor: '#DBEAFE',
   },
   statusText: {
     fontSize: 12,
