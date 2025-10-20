@@ -21,3 +21,6 @@ db_backup/db_cluster-17-10-2025@01-03-28.backup.gz
 !.env.production
 !.env.vercel.production
 test-auth.js
+SEGURANCA_CORS.md
+.gitignore
+test-cors-security.js
