@@ -101,6 +101,6 @@ export interface ApiResponse<T> {
   success: boolean;
 }
 
-export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'failed';
+export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'failed' | 'renegociado';
 export type ContractStatus = 'ativo' | 'completed' | 'cancelled' | 'draft';
 export type ClientStatus = 'ativo' | 'inactive' | 'prospect';
