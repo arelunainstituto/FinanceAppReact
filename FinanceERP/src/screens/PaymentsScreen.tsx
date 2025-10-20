@@ -87,12 +87,12 @@ const PaymentsScreen: React.FC = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, searchQuery, contractId, advancedFilters]);
+  }, [activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
   // Load payments when page or filters change
   useEffect(() => {
     loadPayments();
-  }, [currentPage, activeFilter, searchQuery, contractId, advancedFilters]);
+  }, [currentPage, activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
   const loadPayments = async () => {
     try {

@@ -7,6 +7,8 @@ import {
   Dimensions,
   Modal,
   ScrollView,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -35,6 +37,8 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   rowCountOptions = [10, 25, 50, 100],
 }) => {
   const [showRowCountPicker, setShowRowCountPicker] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customValue, setCustomValue] = useState('');
 
   if (totalPages <= 1 && totalItems <= Math.min(...rowCountOptions)) {
     return null;
@@ -66,9 +70,46 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
     }
   };
 
-  const handleRowCountSelect = (count: number) => {
-    onItemsPerPageChange(count);
+  const handleRowCountSelect = (count: number | 'custom') => {
+    if (count === 'custom') {
+      setShowCustomInput(true);
+    } else {
+      onItemsPerPageChange(count);
+      setShowRowCountPicker(false);
+      setShowCustomInput(false);
+      setCustomValue('');
+    }
+  };
+
+  const handleCustomValueSubmit = () => {
+    const numValue = parseInt(customValue, 10);
+    
+    // Validação do valor
+    if (!customValue.trim()) {
+      Alert.alert('Erro', 'Por favor, insira um valor.');
+      return;
+    }
+    
+    if (isNaN(numValue) || numValue <= 0) {
+      Alert.alert('Erro', 'Por favor, insira um número válido maior que zero.');
+      return;
+    }
+    
+    if (numValue > 1000) {
+      Alert.alert('Erro', 'O valor máximo permitido é 1000 registros por página.');
+      return;
+    }
+    
+    // Aplicar o valor personalizado
+    onItemsPerPageChange(numValue);
     setShowRowCountPicker(false);
+    setShowCustomInput(false);
+    setCustomValue('');
+  };
+
+  const handleCancelCustomInput = () => {
+    setShowCustomInput(false);
+    setCustomValue('');
   };
 
   const startIndex = (currentPage - 1) * itemsPerPage + 1;
@@ -79,38 +120,111 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
       visible={showRowCountPicker}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={() => setShowRowCountPicker(false)}
+      onRequestClose={() => {
+        setShowRowCountPicker(false);
+        setShowCustomInput(false);
+        setCustomValue('');
+      }}
     >
       <View style={styles.pickerContainer}>
         <View style={styles.pickerHeader}>
-          <Text style={styles.pickerTitle}>Linhas por página</Text>
-          <TouchableOpacity onPress={() => setShowRowCountPicker(false)}>
+          <Text style={styles.pickerTitle}>
+            {showCustomInput ? 'Valor Personalizado' : 'Linhas por página'}
+          </Text>
+          <TouchableOpacity onPress={() => {
+            setShowRowCountPicker(false);
+            setShowCustomInput(false);
+            setCustomValue('');
+          }}>
             <Ionicons name="close" size={24} color="#64748B" />
           </TouchableOpacity>
         </View>
         
-        <ScrollView style={styles.pickerList}>
-          {rowCountOptions.map((option) => (
+        {showCustomInput ? (
+          <View style={styles.customInputContainer}>
+            <Text style={styles.customInputLabel}>
+              Insira o número de registros por página:
+            </Text>
+            <TextInput
+              style={styles.customInput}
+              value={customValue}
+              onChangeText={setCustomValue}
+              placeholder="Ex: 30"
+              keyboardType="number-pad"
+              autoFocus
+              maxLength={4}
+            />
+            <Text style={styles.customInputHint}>
+              Valor máximo: 1000 registros
+            </Text>
+            <View style={styles.customInputButtons}>
+              <TouchableOpacity
+                style={[styles.customInputButton, styles.customInputButtonCancel]}
+                onPress={handleCancelCustomInput}
+              >
+                <Text style={styles.customInputButtonTextCancel}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customInputButton, styles.customInputButtonConfirm]}
+                onPress={handleCustomValueSubmit}
+              >
+                <Text style={styles.customInputButtonTextConfirm}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <ScrollView style={styles.pickerList}>
+            {rowCountOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[
+                  styles.pickerOption,
+                  itemsPerPage === option && styles.pickerOptionSelected
+                ]}
+                onPress={() => handleRowCountSelect(option)}
+              >
+                <Text style={[
+                  styles.pickerOptionText,
+                  itemsPerPage === option && styles.pickerOptionTextSelected
+                ]}>
+                  {option} linhas
+                </Text>
+                {itemsPerPage === option && (
+                  <Ionicons name="checkmark" size={20} color="#3B82F6" />
+                )}
+              </TouchableOpacity>
+            ))}
+            
+            {/* Opção Personalizado */}
             <TouchableOpacity
-              key={option}
               style={[
                 styles.pickerOption,
-                itemsPerPage === option && styles.pickerOptionSelected
+                styles.customOption,
+                !rowCountOptions.includes(itemsPerPage) && styles.pickerOptionSelected
               ]}
-              onPress={() => handleRowCountSelect(option)}
+              onPress={() => handleRowCountSelect('custom')}
             >
-              <Text style={[
-                styles.pickerOptionText,
-                itemsPerPage === option && styles.pickerOptionTextSelected
-              ]}>
-                {option} linhas
-              </Text>
-              {itemsPerPage === option && (
+              <View style={styles.customOptionContent}>
+                <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                <Text style={[
+                  styles.pickerOptionText,
+                  styles.customOptionText,
+                  !rowCountOptions.includes(itemsPerPage) && styles.pickerOptionTextSelected
+                ]}>
+                  Personalizado
+                </Text>
+                {!rowCountOptions.includes(itemsPerPage) && (
+                  <Text style={styles.customOptionValue}>
+                    ({itemsPerPage} linhas)
+                  </Text>
+                )}
+              </View>
+              {!rowCountOptions.includes(itemsPerPage) && (
                 <Ionicons name="checkmark" size={20} color="#3B82F6" />
               )}
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          </ScrollView>
+        )}
       </View>
     </Modal>
   );
@@ -334,6 +448,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     paddingHorizontal: 8,
+  },
+  customOption: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    marginTop: 8,
+    paddingTop: 16,
+  },
+  customOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customOptionText: {
+    fontWeight: '600',
+  },
+  customOptionValue: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  customInputContainer: {
+    padding: 20,
+    flex: 1,
+  },
+  customInputLabel: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  customInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+  },
+  customInputHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 24,
+  },
+  customInputButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 'auto',
+  },
+  customInputButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customInputButtonCancel: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  customInputButtonConfirm: {
+    backgroundColor: '#3B82F6',
+  },
+  customInputButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  customInputButtonTextConfirm: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
