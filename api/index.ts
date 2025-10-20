@@ -22,8 +22,9 @@ app.use(helmet());
 
 // CORS configuration - Simple and reliable (like 3 days ago, but with both domains)
 const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [
-  'https://financeapp-areluna.vercel.app',
-  'https://financeapp-lime.vercel.app'
+  'https://financeiro.institutoareluna.pt',      // Produção (domínio customizado)
+  'https://financeapp-areluna.vercel.app',       // Vercel produção
+  'https://financeapp-lime.vercel.app'           // Vercel preview
 ];
 
 // Add dynamic Vercel preview URLs
