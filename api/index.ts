@@ -20,9 +20,40 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - production only
+// CORS configuration - production and preview
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'],
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'];
+    
+    // Log para debug
+    console.log('🌐 CORS Request from origin:', origin);
+    
+    // Aceita requisições sem origin (ex: Postman, mobile apps)
+    if (!origin) {
+      console.log('✅ CORS: Allowing request without origin');
+      callback(null, true);
+      return;
+    }
+    
+    // Verifica se está na lista de origens permitidas
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS: Allowed origin from list');
+      callback(null, true);
+      return;
+    }
+    
+    // Em preview, aceita qualquer URL do Vercel do projeto
+    const isVercelPreview = origin.includes('financeapp-areluna') && origin.includes('.vercel.app');
+    if (isVercelPreview) {
+      console.log('✅ CORS: Allowed Vercel preview URL');
+      callback(null, true);
+      return;
+    }
+    
+    // Rejeita outras origens
+    console.log('❌ CORS: Origin not allowed');
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
