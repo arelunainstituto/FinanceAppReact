@@ -23,7 +23,10 @@ app.use(helmet());
 // CORS configuration - production and preview
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'];
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
+      'https://financeapp-areluna.vercel.app',
+      'https://financeapp-lime.vercel.app'
+    ];
     
     // Log para debug
     console.log('🌐 CORS Request from origin:', origin);
@@ -43,7 +46,7 @@ const corsOptions = {
     }
     
     // Em preview, aceita qualquer URL do Vercel do projeto
-    const isVercelPreview = origin.includes('financeapp-areluna') && origin.includes('.vercel.app');
+    const isVercelPreview = (origin.includes('financeapp-areluna') || origin.includes('financeapp-lime')) && origin.includes('.vercel.app');
     if (isVercelPreview) {
       console.log('✅ CORS: Allowed Vercel preview URL');
       callback(null, true);
