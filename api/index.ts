@@ -20,10 +20,11 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - production and preview
+// CORS configuration - production and preview (seguro)
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
+    // Lista de domínios permitidos explicitamente
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [
       'https://financeapp-areluna.vercel.app',
       'https://financeapp-lime.vercel.app'
     ];
@@ -31,30 +32,45 @@ const corsOptions = {
     // Log para debug
     console.log('🌐 CORS Request from origin:', origin);
     
-    // Aceita requisições sem origin (ex: Postman, mobile apps)
+    // Aceita requisições sem origin apenas em desenvolvimento
     if (!origin) {
-      console.log('✅ CORS: Allowing request without origin');
+      // Em produção, rejeita requisições sem origin por segurança
+      if (process.env.NODE_ENV === 'production') {
+        console.log('❌ CORS: No origin in production mode');
+        callback(new Error('Origin required'));
+        return;
+      }
+      console.log('✅ CORS: Allowing request without origin (dev mode)');
       callback(null, true);
       return;
     }
     
-    // Verifica se está na lista de origens permitidas
+    // Verifica se está na lista de origens permitidas (match exato)
     if (allowedOrigins.includes(origin)) {
       console.log('✅ CORS: Allowed origin from list');
       callback(null, true);
       return;
     }
     
-    // Em preview, aceita qualquer URL do Vercel do projeto
-    const isVercelPreview = (origin.includes('financeapp-areluna') || origin.includes('financeapp-lime')) && origin.includes('.vercel.app');
-    if (isVercelPreview) {
-      console.log('✅ CORS: Allowed Vercel preview URL');
+    // Validação SEGURA para URLs de preview do Vercel
+    // Permite apenas: https://financeapp-{areluna|lime}[-qualquer-coisa].vercel.app
+    const vercelPreviewPatterns = [
+      /^https:\/\/financeapp-areluna(-[a-z0-9]+)?\.vercel\.app$/,
+      /^https:\/\/financeapp-lime(-[a-z0-9]+)?\.vercel\.app$/,
+      /^https:\/\/financeapp-areluna-git-[a-z0-9-]+\.vercel\.app$/,
+      /^https:\/\/financeapp-lime-git-[a-z0-9-]+\.vercel\.app$/
+    ];
+    
+    const isValidVercelPreview = vercelPreviewPatterns.some(pattern => pattern.test(origin));
+    
+    if (isValidVercelPreview) {
+      console.log('✅ CORS: Allowed Vercel preview URL (validated)');
       callback(null, true);
       return;
     }
     
-    // Rejeita outras origens
-    console.log('❌ CORS: Origin not allowed');
+    // Rejeita todas as outras origens
+    console.log('❌ CORS: Origin not allowed -', origin);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
