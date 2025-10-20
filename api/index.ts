@@ -20,10 +20,9 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - production and preview (seguro)
+// CORS configuration - production and preview
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Lista de domínios permitidos explicitamente
     const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [
       'https://financeapp-areluna.vercel.app',
       'https://financeapp-lime.vercel.app'
@@ -32,28 +31,21 @@ const corsOptions = {
     // Log para debug
     console.log('🌐 CORS Request from origin:', origin);
     
-    // Aceita requisições sem origin apenas em desenvolvimento
+    // Aceita requisições sem origin (ex: Postman, mobile apps, servidor para servidor)
     if (!origin) {
-      // Em produção, rejeita requisições sem origin por segurança
-      if (process.env.NODE_ENV === 'production') {
-        console.log('❌ CORS: No origin in production mode');
-        callback(new Error('Origin required'));
-        return;
-      }
-      console.log('✅ CORS: Allowing request without origin (dev mode)');
+      console.log('✅ CORS: Allowing request without origin');
       callback(null, true);
       return;
     }
     
-    // Verifica se está na lista de origens permitidas (match exato)
+    // Verifica se está na lista de origens permitidas
     if (allowedOrigins.includes(origin)) {
       console.log('✅ CORS: Allowed origin from list');
       callback(null, true);
       return;
     }
     
-    // Validação SEGURA para URLs de preview do Vercel
-    // Permite apenas: https://financeapp-{areluna|lime}[-qualquer-coisa].vercel.app
+    // Validação para URLs de preview do Vercel com regex seguro
     const vercelPreviewPatterns = [
       /^https:\/\/financeapp-areluna(-[a-z0-9]+)?\.vercel\.app$/,
       /^https:\/\/financeapp-lime(-[a-z0-9]+)?\.vercel\.app$/,
@@ -69,7 +61,7 @@ const corsOptions = {
       return;
     }
     
-    // Rejeita todas as outras origens
+    // Rejeita outras origens
     console.log('❌ CORS: Origin not allowed -', origin);
     callback(new Error('Not allowed by CORS'));
   },
