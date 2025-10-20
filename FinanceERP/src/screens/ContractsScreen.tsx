@@ -27,10 +27,11 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import { ContractDetailsModal } from '../components/ContractDetailsModal';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportContractsToCSV } from '../utils/csvExport';
+import PaginationControls from '../components/common/PaginationControls';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
-const ITEMS_PER_PAGE = isTablet ? 10 : 8;
+const DEFAULT_ITEMS_PER_PAGE = isTablet ? 10 : 8;
 
 type ContractsScreenNavigationProp = StackNavigationProp<MainStackParamList, 'Contracts'>;
 type ContractsScreenRouteProp = RouteProp<MainStackParamList, 'Contracts'>;
@@ -52,6 +53,7 @@ const ContractsScreen: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   
   // Contract form states
   const [showContractForm, setShowContractForm] = useState(false);
@@ -72,8 +74,8 @@ const ContractsScreen: React.FC = () => {
 
   // Calculate total pages using useMemo to avoid unnecessary recalculations
   const totalPages = useMemo(() => {
-    return Math.ceil(filteredContracts.length / ITEMS_PER_PAGE);
-  }, [filteredContracts.length]);
+    return Math.ceil(filteredContracts.length / itemsPerPage);
+  }, [filteredContracts.length, itemsPerPage]);
 
   // Reset to first page if current page exceeds total pages
   useEffect(() => {
@@ -357,8 +359,8 @@ useEffect(() => {
 
   // Pagination functions
   const getCurrentPageData = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     return filteredContracts.slice(startIndex, endIndex);
   };
 
@@ -380,103 +382,23 @@ useEffect(() => {
     }
   };
 
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
   const renderPaginationControls = () => {
-    if (totalPages <= 1) return null;
-
-    const pageNumbers = [];
-    const maxVisiblePages = isTablet ? 7 : 5;
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
     return (
-      <View style={styles.paginationContainer}>
-        <View style={styles.paginationInfo}>
-          <Text style={styles.paginationText}>
-            Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredContracts.length)} de {filteredContracts.length} contratos
-          </Text>
-        </View>
-        
-        <View style={styles.paginationControls}>
-          <TouchableOpacity
-            style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
-            onPress={goToPreviousPage}
-            disabled={currentPage === 1}
-          >
-            <Ionicons 
-              name="chevron-back" 
-              size={16} 
-              color={currentPage === 1 ? '#9CA3AF' : '#374151'} 
-            />
-          </TouchableOpacity>
-
-          {startPage > 1 && (
-            <React.Fragment key="start-pagination">
-              <TouchableOpacity
-                style={styles.paginationButton}
-                onPress={() => goToPage(1)}
-              >
-                <Text style={styles.paginationButtonText}>1</Text>
-              </TouchableOpacity>
-              {startPage > 2 && (
-                <Text key="start-ellipsis" style={styles.paginationEllipsis}>...</Text>
-              )}
-            </React.Fragment>
-          )}
-
-          {pageNumbers.map((pageNumber) => (
-            <TouchableOpacity
-              key={pageNumber}
-              style={[
-                styles.paginationButton,
-                currentPage === pageNumber && styles.paginationButtonActive
-              ]}
-              onPress={() => goToPage(pageNumber)}
-            >
-              <Text style={[
-                styles.paginationButtonText,
-                currentPage === pageNumber && styles.paginationButtonTextActive
-              ]}>
-                {pageNumber}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          {endPage < totalPages && (
-            <React.Fragment key="end-pagination">
-              {endPage < totalPages - 1 && (
-                <Text key="end-ellipsis" style={styles.paginationEllipsis}>...</Text>
-              )}
-              <TouchableOpacity
-                style={styles.paginationButton}
-                onPress={() => goToPage(totalPages)}
-              >
-                <Text style={styles.paginationButtonText}>{totalPages}</Text>
-              </TouchableOpacity>
-            </React.Fragment>
-          )}
-
-          <TouchableOpacity
-            style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
-            onPress={goToNextPage}
-            disabled={currentPage === totalPages}
-          >
-            <Ionicons 
-              name="chevron-forward" 
-              size={16} 
-              color={currentPage === totalPages ? '#9CA3AF' : '#374151'} 
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredContracts.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={goToPage}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        itemType="contratos"
+        rowCountOptions={[5, 8, 10, 15, 20, 25, 50]}
+      />
     );
   };
 

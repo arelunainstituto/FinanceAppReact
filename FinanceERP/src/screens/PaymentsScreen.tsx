@@ -27,10 +27,11 @@ import { ManualPaymentModal } from '../components/ManualPaymentModal';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportPaymentsToCSV } from '../utils/csvExport';
 import ExportConfirmModal from '../components/common/ExportConfirmModal';
+import PaginationControls from '../components/common/PaginationControls';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
-const ITEMS_PER_PAGE = isTablet ? 10 : 8;
+const DEFAULT_ITEMS_PER_PAGE = isTablet ? 10 : 8;
 
 type PaymentFilter = 'all' | 'pending' | 'paid' | 'overdue' | 'failed';
 type PaymentsScreenRouteProp = RouteProp<MainStackParamList, 'Payments'>;
@@ -53,6 +54,7 @@ const PaymentsScreen: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [contractNumber, setContractNumber] = useState<string>('');
   
   // Pagination state from backend
@@ -85,12 +87,12 @@ const PaymentsScreen: React.FC = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, searchQuery, contractId, advancedFilters]);
+  }, [activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
   // Load payments when page or filters change
   useEffect(() => {
     loadPayments();
-  }, [currentPage, activeFilter, searchQuery, contractId, advancedFilters]);
+  }, [currentPage, activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
   const loadPayments = async () => {
     try {
@@ -147,7 +149,7 @@ const PaymentsScreen: React.FC = () => {
         const response = await ApiService.getPaymentsByContractPaginated(
           contractId, 
           currentPage, 
-          ITEMS_PER_PAGE,
+          itemsPerPage,
           filtersWithConvertedDates
         );
         
@@ -176,7 +178,7 @@ const PaymentsScreen: React.FC = () => {
         
         const response = await ApiService.getPaymentsPaginated(
           currentPage, 
-          ITEMS_PER_PAGE, 
+          itemsPerPage, 
           filtersWithConvertedDates
         );
         
@@ -219,104 +221,25 @@ const PaymentsScreen: React.FC = () => {
     }
   };
 
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
   const renderPaginationControls = () => {
     if (totalPages <= 1) return null;
 
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    const pageNumbers = [];
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
-    }
-
     return (
-      <View style={styles.paginationContainer}>
-        <View style={styles.paginationInfo}>
-          <Text style={styles.paginationText}>
-            Mostrando {((currentPage - 1) * 10) + 1} - {Math.min(currentPage * 10, totalItems)} de {totalItems} pagamentos
-          </Text>
-        </View>
-        
-        <View style={styles.paginationControls}>
-          <TouchableOpacity
-            style={[styles.paginationButton, !hasPreviousPage && styles.paginationButtonDisabled]}
-            onPress={goToPreviousPage}
-            disabled={!hasPreviousPage}
-          >
-            <Ionicons 
-              name="chevron-back" 
-              size={16} 
-              color={!hasPreviousPage ? '#9CA3AF' : '#374151'} 
-            />
-          </TouchableOpacity>
-
-          {startPage > 1 && (
-            <React.Fragment key="start-pagination">
-              <TouchableOpacity
-                style={styles.paginationButton}
-                onPress={() => goToPage(1)}
-              >
-                <Text style={styles.paginationButtonText}>1</Text>
-              </TouchableOpacity>
-              {startPage > 2 && (
-                <Text key="start-ellipsis" style={styles.paginationEllipsis}>...</Text>
-              )}
-            </React.Fragment>
-          )}
-
-          {pageNumbers.map((pageNumber) => (
-            <TouchableOpacity
-              key={pageNumber}
-              style={[
-                styles.paginationButton,
-                currentPage === pageNumber && styles.paginationButtonActive
-              ]}
-              onPress={() => goToPage(pageNumber)}
-            >
-              <Text
-                style={[
-                  styles.paginationButtonText,
-                  currentPage === pageNumber && styles.paginationButtonTextActive
-                ]}
-              >
-                {pageNumber}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          {endPage < totalPages && (
-            <React.Fragment key="end-pagination">
-              {endPage < totalPages - 1 && (
-                <Text key="end-ellipsis" style={styles.paginationEllipsis}>...</Text>
-              )}
-              <TouchableOpacity
-                style={styles.paginationButton}
-                onPress={() => goToPage(totalPages)}
-              >
-                <Text style={styles.paginationButtonText}>{totalPages}</Text>
-              </TouchableOpacity>
-            </React.Fragment>
-          )}
-
-          <TouchableOpacity
-            style={[styles.paginationButton, !hasNextPage && styles.paginationButtonDisabled]}
-            onPress={goToNextPage}
-            disabled={!hasNextPage}
-          >
-            <Ionicons 
-              name="chevron-forward" 
-              size={16} 
-              color={!hasNextPage ? '#9CA3AF' : '#374151'} 
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={goToPage}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        itemType="pagamentos"
+        rowCountOptions={[5, 8, 10, 15, 20, 25]}
+      />
     );
   };
 
