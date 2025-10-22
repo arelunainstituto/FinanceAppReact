@@ -55,3 +55,4 @@ deploy.sh
 GUIA_VARIAVEIS_VERCEL.md
 verificar-env-vercel.sh
 db_backup/teste_importacao_5_pagamentos_reais.xlsx
+CORRECAO_API_URL.md
