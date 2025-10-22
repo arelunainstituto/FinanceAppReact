@@ -548,10 +548,11 @@ export class PaymentService {
       }
 
       // ⚡ OTIMIZAÇÃO: Cache de dados para evitar queries repetidas
-      console.log('📦 Loading all clients and contracts into cache...');
+      console.log('📦 Loading all data into cache...');
       const allClients = await this.clientRepository.findAll();
       const allContracts = await this.contractRepository.findAll();
-      console.log(`📦 Cache loaded: ${allClients.length} clients, ${allContracts.length} contracts`);
+      const allPayments = await this.paymentRepository.findAll();
+      console.log(`📦 Cache loaded: ${allClients.length} clients, ${allContracts.length} contracts, ${allPayments.length} payments`);
 
       // Processar cada linha (começando da linha 2, pulando o header)
       console.log(`📊 Processing ${data.length - 1} rows...`);
@@ -620,12 +621,12 @@ export class PaymentService {
             continue;
           }
           
-          // Buscar todos os pagamentos pendentes do cliente em todos os seus contratos
+          // ⚡ Buscar todos os pagamentos pendentes do cliente em todos os seus contratos (usando cache)
           let oldestPendingPayment: Payment | null = null;
           let oldestDueDate: Date | null = null;
           
           for (const contract of clientContracts) {
-            const payments = await this.paymentRepository.findByContractId(contract.id);
+            const payments = allPayments.filter(p => p.contract_id === contract.id);
             const pendingPayments = payments.filter(p => p.status === 'pending');
             
             for (const payment of pendingPayments) {
@@ -694,8 +695,8 @@ export class PaymentService {
             continue;
           }
           
-          // Buscar contrato para obter o número
-          const contract = await this.contractRepository.findById(oldestPendingPayment.contract_id);
+          // ⚡ Buscar contrato para obter o número (usando cache)
+          const contract = allContracts.find(c => c.id === oldestPendingPayment.contract_id);
           
           successfulPayments.push({
             clientName,
