@@ -50,4 +50,8 @@ teste_importacao_manual.md
 # Deployment
 DEPLOY-GUIDE.md
 deploy.sh
+
+# Temporary guides and scripts
+GUIA_VARIAVEIS_VERCEL.md
+verificar-env-vercel.sh
 db_backup/teste_importacao_5_pagamentos_reais.xlsx
