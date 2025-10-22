@@ -297,6 +297,55 @@ class ApiService {
     });
   }
 
+  async importPaymentsFromExcel(file: File | { uri: string; name: string; type: string }): Promise<ApiResponse<{
+    success: {
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+      paymentId: string;
+    }[];
+    errors: {
+      row: number;
+      clientName?: string;
+      amount?: number;
+      error: string;
+    }[];
+  }>> {
+    const token = await AsyncStorage.getItem('auth_token');
+    
+    const formData = new FormData();
+    
+    // Check if it's a File object (web) or React Native file object
+    if (file instanceof File) {
+      formData.append('file', file);
+    } else {
+      // React Native file object
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      } as any);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/payments/import`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        // Don't set Content-Type, let the browser set it with the boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('🌐 Error response:', errorText);
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async processManualPayment(id: string, amount: number, usePositiveBalance?: number, paymentMethod?: string): Promise<ApiResponse<{
     payment: Payment;
     newPayment?: Payment;

@@ -28,6 +28,7 @@ import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportPaymentsToCSV } from '../utils/csvExport';
 import ExportConfirmModal from '../components/common/ExportConfirmModal';
 import PaginationControls from '../components/common/PaginationControls';
+import ImportPaymentsModal from '../components/ImportPaymentsModal';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
@@ -84,6 +85,9 @@ const PaymentsScreen: React.FC = () => {
   // Export confirmation modal state
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -737,6 +741,15 @@ const PaymentsScreen: React.FC = () => {
             </View>
             <View style={styles.headerButtons}>
               <TouchableOpacity
+                style={styles.importButton}
+                onPress={() => setShowImportModal(true)}
+              >
+                <Ionicons name="cloud-upload" size={16} color="#3B82F6" />
+                <Text style={styles.importButtonText}>
+                  Importar Planilha
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[
                   styles.exportButton,
                   (!payments || payments.length === 0) && { opacity: 0.5 }
@@ -906,6 +919,15 @@ const PaymentsScreen: React.FC = () => {
         onConfirm={handleConfirmExport}
         onClose={() => setShowExportModal(false)}
         isLoading={isExporting}
+      />
+
+      <ImportPaymentsModal
+        visible={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          loadPayments();
+          setShowImportModal(false);
+        }}
       />
     </MainLayout>
   );
@@ -1166,6 +1188,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  importButtonText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+    marginLeft: 6,
   },
   exportButton: {
     flexDirection: 'row',
