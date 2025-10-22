@@ -21,6 +21,14 @@ export class PaymentService {
     return this.paymentRepository.findAll();
   }
 
+  async getRecentPayments(limit: number = 5): Promise<Payment[]> {
+    return this.paymentRepository.findRecent(limit);
+  }
+
+  async getUpcomingPayments(limit: number = 5): Promise<Payment[]> {
+    return this.paymentRepository.findUpcoming(limit);
+  }
+
   async getAllPaymentsForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
     return this.paymentRepository.findAllForExport(filters);
   }

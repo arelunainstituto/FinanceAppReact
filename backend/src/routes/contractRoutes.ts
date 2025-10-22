@@ -9,6 +9,7 @@ const contractController = new ContractController();
 router.use(authenticateToken);
 
 // Contract CRUD routes
+router.get('/recent', contractController.getRecentContracts);
 router.get('/', contractController.getAllContracts);
 router.get('/:id', contractController.getContractById);
 router.get('/:id/details', contractController.getContractDetails);

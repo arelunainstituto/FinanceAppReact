@@ -70,14 +70,14 @@ export interface User {
 
 export interface DashboardStats {
   totalClients: number;
+  activeClients: number;
   totalContracts: number;
   activeContracts: number;
   totalPayments: number;
-  totalRevenue: number;
+  totalRevenue: number; // Valor total dos contratos
+  totalReceived: number; // Valor efetivamente recebido
   pendingPayments: number;
   overduePayments: number;
-  activeClients: number;
-  totalReceived: number;
   monthlyRevenue: Array<{
     month: string;
     revenue: number;

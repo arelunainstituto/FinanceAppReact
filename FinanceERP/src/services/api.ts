@@ -375,6 +375,18 @@ class ApiService {
     return this.request<DashboardStats>('/dashboard/stats');
   }
 
+  async getRecentPayments(): Promise<ApiResponse<Payment[]>> {
+    return this.request<Payment[]>('/payments/recent');
+  }
+
+  async getUpcomingPayments(): Promise<ApiResponse<Payment[]>> {
+    return this.request<Payment[]>('/payments/upcoming');
+  }
+
+  async getRecentContracts(): Promise<ApiResponse<Contract[]>> {
+    return this.request<Contract[]>('/contracts/recent');
+  }
+
   async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
     return this.request<{ message: string }>('/auth/forgot-password', {
       method: 'POST',

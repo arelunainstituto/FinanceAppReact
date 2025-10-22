@@ -8,21 +8,35 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { SafeLineChart } from '../components/charts/ChartWrapper';
-import { DashboardStats } from '../types';
+import { DashboardStats, Payment, Contract } from '../types';
 import ApiService from '../services/api';
-import Card from '../components/common/Card';
 import MainLayout from '../components/layout/MainLayout';
 import { formatCurrencyCompact } from '../utils/currency';
+import MetricCard from '../components/dashboard/MetricCard';
+import RevenueChart from '../components/dashboard/RevenueChart';
+import PaymentStatusChart from '../components/dashboard/PaymentStatusChart';
+import ContractsChart from '../components/dashboard/ContractsChart';
+import RecentActivity from '../components/dashboard/RecentActivity';
+import QuickStats from '../components/dashboard/QuickStats';
 
 const screenWidth = Dimensions.get('window').width;
 const isTablet = screenWidth > 768;
-const cardPadding = isTablet ? 24 : 16; // Responsive padding
-// Ajuste mais conservador para evitar extrapolação
-const chartWidth = screenWidth - (cardPadding * 2) - (isTablet ? 100 : 80); // Margem mais segura
+const cardPadding = isTablet ? 24 : 16;
+
+interface DashboardData {
+  stats: DashboardStats | null;
+  recentPayments: Payment[];
+  upcomingPayments: Payment[];
+  recentContracts: Contract[];
+}
 
 const DashboardScreen: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [data, setData] = useState<DashboardData>({
+    stats: null,
+    recentPayments: [],
+    upcomingPayments: [],
+    recentContracts: [],
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -34,41 +48,57 @@ const DashboardScreen: React.FC = () => {
     try {
       console.log('📊 === LOADING DASHBOARD DATA ===');
       setIsLoading(true);
-      const response = await ApiService.getDashboardStats();
-      console.log('📊 Dashboard response:', JSON.stringify(response, null, 2));
-      if (response.success) {
-        console.log('📊 ✅ Dashboard data loaded successfully');
-        setStats(response.data);
-      } else {
-        console.log('📊 ❌ Dashboard response not successful');
-      }
+
+      // Carregar todos os dados em paralelo
+      const [statsResponse, recentPaymentsResponse, upcomingPaymentsResponse, recentContractsResponse] = 
+        await Promise.all([
+          ApiService.getDashboardStats(),
+          ApiService.getRecentPayments(),
+          ApiService.getUpcomingPayments(),
+          ApiService.getRecentContracts(),
+        ]);
+
+      console.log('📊 Dashboard responses received');
+
+      setData({
+        stats: statsResponse.success ? statsResponse.data : null,
+        recentPayments: recentPaymentsResponse.success ? recentPaymentsResponse.data : [],
+        upcomingPayments: upcomingPaymentsResponse.success ? upcomingPaymentsResponse.data : [],
+        recentContracts: recentContractsResponse.success ? recentContractsResponse.data : [],
+      });
     } catch (error) {
       console.error('❌ Error loading dashboard data:', error);
-      console.log('📊 Using mock data for development');
-      // Mock data for development - Dados baseados nos números reais do banco
-      setStats({
-        totalClients: 580,
-        activeClients: 532, // Número real informado pelo usuário
-        totalContracts: 245,
-        activeContracts: 198,
-        totalPayments: 1850,
-        pendingPayments: 67,
-        overduePayments: 12,
-        totalReceived: 185000,
-        totalRevenue: 220000,
-        monthlyRevenue: [
-          { month: 'Jan', revenue: 15000 },
-          { month: 'Fev', revenue: 18000 },
-          { month: 'Mar', revenue: 22000 },
-          { month: 'Abr', revenue: 19000 },
-          { month: 'Mai', revenue: 25000 },
-          { month: 'Jun', revenue: 18500 },
-        ],
-        paymentsByStatus: [
-          { status: 'paid', count: 1771 },
-          { status: 'pending', count: 67 },
-          { status: 'overdue', count: 12 },
-        ],
+      // Usar dados mock em caso de erro (baseados nos dados reais do Supabase)
+      setData({
+        stats: {
+          totalClients: 519,
+          activeClients: 511,
+          totalContracts: 558,
+          activeContracts: 557,
+          totalPayments: 11781,
+          pendingPayments: 4896, // 5332 - 436 (pending não atrasados)
+          overduePayments: 436,
+          totalRevenue: 5769791, // Valor total dos contratos
+          totalReceived: 3005790, // Valor efetivamente recebido (CORRIGIDO)
+          monthlyRevenue: [
+            { month: 'Mai', revenue: 0 },
+            { month: 'Jun', revenue: 0 },
+            { month: 'Jul', revenue: 0 },
+            { month: 'Ago', revenue: 839 },
+            { month: 'Set', revenue: 0 },
+            { month: 'Out', revenue: 217771 },
+          ],
+          paymentsByStatus: [
+            { status: 'paid', count: 6120 },
+            { status: 'pending', count: 4896 },
+            { status: 'overdue', count: 436 },
+            { status: 'renegociado', count: 326 },
+            { status: 'failed', count: 3 },
+          ],
+        },
+        recentPayments: [],
+        upcomingPayments: [],
+        recentContracts: [],
       });
     } finally {
       console.log('📊 === DASHBOARD LOADING COMPLETE ===');
@@ -82,154 +112,135 @@ const DashboardScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const chartConfig = {
-    backgroundColor: '#ffffff',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(28, 28, 30, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: '6',
-      strokeWidth: '2',
-      stroke: '#007AFF',
-    },
-    propsForBackgroundLines: {
-      strokeDasharray: '', // solid line
-      stroke: '#E9ECEF',
-      strokeWidth: 1,
-    },
-    fillShadowGradient: '#007AFF',
-    fillShadowGradientOpacity: 0.1,
+  const calculateMetrics = () => {
+    if (!data.stats) {
+      return {
+        defaultRate: 0,
+        avgRevenuePerContract: 0,
+        monthlyGrowth: 0,
+      };
+    }
+
+    const totalPayments = data.stats.totalPayments || 1;
+    const overduePayments = data.stats.overduePayments || 0;
+    const defaultRate = (overduePayments / totalPayments) * 100;
+
+    const avgRevenuePerContract = data.stats.activeContracts > 0
+      ? data.stats.totalRevenue / data.stats.activeContracts
+      : 0;
+
+    // Calcular crescimento mensal (comparar últimos 2 meses)
+    let monthlyGrowth = 0;
+    if (data.stats.monthlyRevenue && data.stats.monthlyRevenue.length >= 2) {
+      const lastMonth = data.stats.monthlyRevenue[data.stats.monthlyRevenue.length - 1].revenue;
+      const previousMonth = data.stats.monthlyRevenue[data.stats.monthlyRevenue.length - 2].revenue;
+      if (previousMonth > 0) {
+        monthlyGrowth = ((lastMonth - previousMonth) / previousMonth) * 100;
+      }
+    }
+
+    return { defaultRate, avgRevenuePerContract, monthlyGrowth };
   };
 
-  const revenueData = {
-    labels: stats?.monthlyRevenue && stats.monthlyRevenue.length > 0 
-      ? stats.monthlyRevenue.map(item => item.month)
-      : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-    datasets: [
-      {
-        data: stats?.monthlyRevenue && stats.monthlyRevenue.length > 0 
-          ? stats.monthlyRevenue.map(item => Math.max(0, item.revenue))
-          : [13875, 15725, 20350, 16650, 19425, 18500],
-        color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-        strokeWidth: 2,
-      },
-    ],
-  };
+  const metrics = calculateMetrics();
 
-
-
-  if (isLoading && !stats) {
+  if (isLoading && !data.stats) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Carregando...</Text>
-      </View>
+      <MainLayout activeRoute="Dashboard">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Carregando dados do dashboard...</Text>
+        </View>
+      </MainLayout>
     );
   }
 
   return (
     <MainLayout activeRoute="Dashboard">
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={{ marginTop: 16, color: '#6C757D' }}>
-            Carregando dados do dashboard...
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          bounces={true}
-          alwaysBounceVertical={true}
-          scrollEventThrottle={16}
-          nestedScrollEnabled={true}
-          keyboardShouldPersistTaps="handled"
-          overScrollMode="always"
-        >
-          <View style={styles.container}>
-            <Text style={styles.title}>Dashboard</Text>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        bounces={true}
+        alwaysBounceVertical={true}
+        scrollEventThrottle={16}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+        overScrollMode="always"
+      >
+        <View style={styles.container}>
+          <Text style={styles.title}>Dashboard</Text>
 
-            {/* Stats Grid */}
-            <View style={styles.statsGrid}>
-              {/* Active Clients Card */}
-              <View style={styles.statCard}>
-                <Text style={[styles.statNumber]}>{stats?.activeClients || 0}</Text>
-                <Text style={styles.statLabel}>CLIENTES ATIVOS</Text>
-                <View style={[styles.badge, styles.activeBadge]}>
-                  <Text style={styles.badgeText}>+32%</Text>
-                </View>
-              </View>
-
-              {/* Total Revenue Card */}
-              <View style={styles.statCard}>
-                <Text style={[styles.statNumber, styles.revenueNumber]}>
-                  {formatCurrencyCompact(stats?.totalRevenue || 0)}
-                </Text>
-                <Text style={styles.statLabel}>RECEITA TOTAL</Text>
-                <View style={[styles.badge, styles.revenueBadge]}>
-                  <Text style={styles.badgeText}>+8%</Text>
-                </View>
-              </View>
-
-              {/* Active Contracts Card */}
-              <View style={styles.statCard}>
-                <Text style={[styles.statNumber, styles.contractsNumber]}>
-                  {stats?.activeContracts || 0}
-                </Text>
-                <Text style={styles.statLabel}>CONTRATOS ATIVOS</Text>
-                <View style={[styles.badge, styles.contractsBadge]}>
-                  <Text style={styles.badgeText}>+5</Text>
-                </View>
-              </View>
-
-              {/* Pending Payments Card */}
-              <View style={styles.statCard}>
-                <Text style={[styles.statNumber, styles.paymentsNumber]}>
-                  {stats?.pendingPayments || 0}
-                </Text>
-                <Text style={styles.statLabel}>PAGAMENTOS PENDENTES</Text>
-                <View style={[styles.badge, styles.paymentsBadge]}>
-                  <Text style={styles.badgeText}>-3</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Revenue Chart */}
-            <View style={styles.chartCard}>
-              <Text style={styles.chartTitle}>Receita Mensal</Text>
-              <SafeLineChart
-                data={revenueData}
-                width={chartWidth}
-                height={220}
-                chartConfig={chartConfig}
-                bezier
-                style={styles.chart}
-                withInnerLines={false}
-                withOuterLines={false}
-                withVerticalLines={false}
-                withHorizontalLines={true}
-                fromZero={true}
-              />
-            </View>
-
-
-
-
-
-
+          {/* Seção 1: Cards de Métricas Principais */}
+          <View style={styles.statsGrid}>
+            <MetricCard
+              title="CLIENTES ATIVOS"
+              value={data.stats?.activeClients || 0}
+              badgeText="+32%"
+              badgeColor="#D4EDDA"
+              valueColor="#2C3E50"
+            />
+            <MetricCard
+              title="TOTAL RECEBIDO"
+              value={formatCurrencyCompact(data.stats?.totalReceived || 0)}
+              badgeText="+8%"
+              badgeColor="#D1ECF1"
+              valueColor="#28A745"
+            />
+            <MetricCard
+              title="CONTRATOS ATIVOS"
+              value={data.stats?.activeContracts || 0}
+              badgeText="+5"
+              badgeColor="#CCE5FF"
+              valueColor="#007BFF"
+            />
+            <MetricCard
+              title="PAGAMENTOS PENDENTES"
+              value={data.stats?.pendingPayments || 0}
+              badgeText="-3"
+              badgeColor="#FFF3CD"
+              valueColor="#FD7E14"
+            />
           </View>
-        </ScrollView>
-      )}
+
+          {/* Seção 2: Gráficos de Análise */}
+          <RevenueChart data={data.stats?.monthlyRevenue || []} />
+          
+          <PaymentStatusChart data={data.stats?.paymentsByStatus || []} />
+          
+          <ContractsChart
+            activeContracts={data.stats?.activeContracts || 0}
+            totalContracts={data.stats?.totalContracts || 0}
+          />
+
+          {/* Seção 3: Indicadores Rápidos */}
+          <QuickStats
+            defaultRate={metrics.defaultRate}
+            avgRevenuePerContract={metrics.avgRevenuePerContract}
+            monthlyGrowth={metrics.monthlyGrowth}
+          />
+
+          {/* Seção 4: Listas de Atividades */}
+          <RecentActivity
+            type="payments"
+            recentPayments={data.recentPayments}
+          />
+
+          <RecentActivity
+            type="upcoming"
+            upcomingPayments={data.upcomingPayments}
+          />
+
+          <RecentActivity
+            type="contracts"
+            recentContracts={data.recentContracts}
+          />
+        </View>
+      </ScrollView>
     </MainLayout>
   );
 };
@@ -238,12 +249,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-    overflow: 'scroll', // Enable scroll behavior
+    overflow: 'scroll',
   },
   scrollContent: {
-    paddingBottom: 100, // Increased padding to ensure content is not cut off
+    paddingBottom: 100,
     flexGrow: 1,
-    minHeight: '100%', // Ensure content takes full height
+    minHeight: '100%',
   },
   container: {
     backgroundColor: '#F8F9FA',
@@ -254,6 +265,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6C757D',
+    fontSize: 14,
   },
   title: {
     fontSize: isTablet ? 32 : 28,
@@ -268,148 +284,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: isTablet ? 32 : 24,
     gap: isTablet ? 16 : 12,
-  },
-  statCard: {
-    width: isTablet ? '48%' : '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: isTablet ? 24 : 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    position: 'relative',
-    marginBottom: isTablet ? 0 : 12,
-  },
-  statNumber: {
-    fontSize: isTablet ? 36 : 28,
-    fontWeight: '800',
-    color: '#2C3E50',
-    marginBottom: 8,
-    letterSpacing: -1,
-  },
-  revenueNumber: {
-    color: '#28A745',
-  },
-  contractsNumber: {
-    color: '#007BFF',
-  },
-  paymentsNumber: {
-    color: '#FD7E14',
-  },
-  statLabel: {
-    fontSize: isTablet ? 14 : 12,
-    color: '#6C757D',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 16,
-  },
-  badge: {
-    position: 'absolute',
-    top: isTablet ? 16 : 12,
-    right: isTablet ? 16 : 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  activeBadge: {
-    backgroundColor: '#D4EDDA',
-  },
-  revenueBadge: {
-    backgroundColor: '#D1ECF1',
-  },
-  contractsBadge: {
-    backgroundColor: '#CCE5FF',
-  },
-  paymentsBadge: {
-    backgroundColor: '#FFF3CD',
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#495057',
-  },
-  chartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: isTablet ? 24 : 16,
-    marginBottom: isTablet ? 24 : 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    overflow: 'hidden', // Evita que o conteúdo extrapole
-    width: '100%', // Garante largura total disponível
-  },
-  chartTitle: {
-    fontSize: isTablet ? 20 : 18,
-    fontWeight: '700',
-    color: '#2C3E50',
-    marginBottom: isTablet ? 20 : 16,
-    letterSpacing: -0.3,
-  },
-  chart: {
-    borderRadius: 8,
-    marginVertical: 8,
-    alignSelf: 'center',
-    overflow: 'hidden', // Evita extrapolação
-    maxWidth: '100%', // Garante que não ultrapasse o container
-  },
-  activityCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: isTablet ? 24 : 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FA',
-  },
-  activityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#007BFF',
-    marginRight: 16,
-  },
-  paymentDot: {
-    backgroundColor: '#28A745',
-  },
-  contractDot: {
-    backgroundColor: '#FD7E14',
-  },
-  activityText: {
-    fontSize: isTablet ? 14 : 13,
-    color: '#495057',
-    flex: 1,
-    fontWeight: '500',
   },
 });
 

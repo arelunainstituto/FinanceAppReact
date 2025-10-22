@@ -34,6 +34,8 @@ router.use(authenticateToken);
 // Specific routes first (to avoid conflicts with /:id)
 router.post('/import', upload.single('file'), paymentController.importPaymentsFromExcel);
 router.get('/paginated', paymentController.getAllPaymentsPaginated);
+router.get('/recent', paymentController.getRecentPayments);
+router.get('/upcoming', paymentController.getUpcomingPayments);
 router.get('/contract/:contractId', paymentController.getPaymentsByContractId);
 router.get('/contract/:contractId/paginated', paymentController.getPaymentsByContractIdPaginated);
 router.get('/status/:status', paymentController.getPaymentsByStatus);

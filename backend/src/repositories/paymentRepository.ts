@@ -68,6 +68,62 @@ export class PaymentRepository {
     }
   }
 
+  async findRecent(limit: number = 5): Promise<Payment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          contract:contracts(
+            *,
+            client:clients(*)
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching recent payments:', error);
+        throw new Error('Failed to fetch recent payments');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching recent payments:', error);
+      throw new Error('Failed to fetch recent payments');
+    }
+  }
+
+  async findUpcoming(limit: number = 5): Promise<Payment[]> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          contract:contracts(
+            *,
+            client:clients(*)
+          )
+        `)
+        .eq('status', 'pending')
+        .gte('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching upcoming payments:', error);
+        throw new Error('Failed to fetch upcoming payments');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching upcoming payments:', error);
+      throw new Error('Failed to fetch upcoming payments');
+    }
+  }
+
   async findAllForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
     try {
       const { 

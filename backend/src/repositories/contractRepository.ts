@@ -61,6 +61,29 @@ export class ContractRepository {
     }
   }
 
+  async findRecent(limit: number = 5): Promise<Contract[]> {
+    try {
+      const { data, error } = await supabase
+        .from('contracts')
+        .select(`
+          *,
+          client:clients(*)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching recent contracts:', error);
+        throw new Error('Failed to fetch recent contracts');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching recent contracts:', error);
+      throw new Error('Failed to fetch recent contracts');
+    }
+  }
+
   async findAllPaginated(options: PaginationOptions = {}, filters: ContractFilters = {}): Promise<PaginatedResult<Contract>> {
     try {
       const { page = 1, limit = 50 } = options;
