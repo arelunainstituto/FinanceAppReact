@@ -24,3 +24,4 @@ test-auth.js
 SEGURANCA_CORS.md
 .gitignore
 test-cors-security.js
+db_backup/dados stripe.xlsx
