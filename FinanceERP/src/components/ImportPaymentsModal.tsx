@@ -135,16 +135,37 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
       console.log('🔑 Token obtido para importação:', token ? 'Token presente' : 'Token ausente');
 
       // Get API URL - match the logic from api.ts
-      let API_URL = 'https://financeappreact.vercel.app';
-      
-      if (process.env.REACT_APP_API_BASE_URL) {
-        API_URL = process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '').replace(/\/api$/, '');
-      } else if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-        API_URL = 'http://localhost:3000';
-        console.log('🌐 Using development API URL:', API_URL);
-      }
+      const getApiUrl = () => {
+        // PRIORITY 1: Use environment variable if available
+        if (process.env.REACT_APP_API_BASE_URL) {
+          const url = process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '').replace(/\/api$/, '');
+          console.log('🌐 Using API URL from environment:', url);
+          return url;
+        }
+        
+        // PRIORITY 2: Detect based on current domain
+        if (typeof window !== 'undefined') {
+          const currentUrl = window.location.origin;
+          
+          // Development: localhost
+          if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+            console.log('🌐 Using localhost API URL');
+            return 'http://localhost:3000';
+          }
+          
+          // Production or Vercel deployments: use same domain
+          console.log('🌐 Using current domain API URL:', currentUrl);
+          return currentUrl;
+        }
+        
+        // PRIORITY 3: Fallback
+        console.log('🌐 Using fallback API URL');
+        return 'https://financeiro.institutoareluna.pt';
+      };
 
-      console.log('📤 Sending import request...');
+      const API_URL = getApiUrl();
+      console.log('📤 Sending import request to:', `${API_URL}/api/payments/import`);
+
       const response = await fetch(`${API_URL}/api/payments/import`, {
         method: 'POST',
         headers: {
