@@ -172,6 +172,8 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
           'Authorization': `Bearer ${token}`,
         },
         body: formData,
+        // Add timeout for long-running imports
+        signal: AbortSignal.timeout(55000), // 55s timeout (before Vercel's 60s limit)
       });
 
       console.log('📥 Response received, clearing progress interval...');
@@ -179,12 +181,25 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
       setUploadProgress(100);
       console.log('✓ Progress set to 100%');
 
+      // Check for timeout or errors before parsing
+      if (!response.ok) {
+        let errorMessage = 'Erro ao processar arquivo';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // If can't parse JSON, use status text
+          if (response.status === 504 || response.status === 524) {
+            errorMessage = 'Timeout: O arquivo é muito grande ou tem muitos registros. Tente com uma planilha menor.';
+          } else {
+            errorMessage = `Erro ${response.status}: ${response.statusText}`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
       console.log('📊 Response data parsed:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao processar arquivo');
-      }
 
       console.log('✅ Import result:', data);
       
