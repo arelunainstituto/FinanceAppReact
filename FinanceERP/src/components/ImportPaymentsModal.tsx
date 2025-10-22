@@ -172,8 +172,6 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
           'Authorization': `Bearer ${token}`,
         },
         body: formData,
-        // Add timeout for long-running imports
-        signal: AbortSignal.timeout(55000), // 55s timeout (before Vercel's 60s limit)
       });
 
       console.log('📥 Response received, clearing progress interval...');
