@@ -547,6 +547,12 @@ export class PaymentService {
         throw createError('Coluna "Status" não encontrada na planilha', 400);
       }
 
+      // ⚡ OTIMIZAÇÃO: Cache de dados para evitar queries repetidas
+      console.log('📦 Loading all clients and contracts into cache...');
+      const allClients = await this.clientRepository.findAll();
+      const allContracts = await this.contractRepository.findAll();
+      console.log(`📦 Cache loaded: ${allClients.length} clients, ${allContracts.length} contracts`);
+
       // Processar cada linha (começando da linha 2, pulando o header)
       console.log(`📊 Processing ${data.length - 1} rows...`);
       for (let i = 1; i < data.length; i++) {
@@ -588,9 +594,8 @@ export class PaymentService {
           
           const clientName = clientNameMatch[1].trim();
           
-          // Buscar cliente por first_name (correspondência exata)
-          const clients = await this.clientRepository.findAll();
-          const client = clients.find(c => 
+          // ⚡ Usar cache ao invés de query
+          const client = allClients.find(c => 
             c.first_name.toLowerCase() === clientName.toLowerCase()
           );
           
@@ -603,9 +608,8 @@ export class PaymentService {
             continue;
           }
           
-          // Buscar contratos do cliente
-          const contracts = await this.contractRepository.findAll();
-          const clientContracts = contracts.filter(c => c.client_id === client.id);
+          // ⚡ Usar cache ao invés de query
+          const clientContracts = allContracts.filter(c => c.client_id === client.id);
           
           if (clientContracts.length === 0) {
             errors.push({
