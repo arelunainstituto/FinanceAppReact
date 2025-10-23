@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
 import { Payment, Contract } from '../../types';
+import { useInView } from '../../hooks/useInView';
 
 const screenWidth = Dimensions.get('window').width;
 const isTablet = screenWidth > 768;
@@ -18,6 +19,29 @@ const RecentActivity: React.FC<RecentActivityProps> = ({
   recentContracts = [],
   type,
 }) => {
+  // Detectar quando elemento entra na viewport
+  const [ref, isInView] = useInView({ threshold: 0.2, triggerOnce: true });
+
+  // Animação de fade-in e slide-up
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(30));
+
+  useEffect(() => {
+    if (isInView) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isInView]);
   const getTitle = () => {
     switch (type) {
       case 'payments':
@@ -113,10 +137,19 @@ const RecentActivity: React.FC<RecentActivityProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      ref={ref}
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
       <Text style={styles.title}>{getTitle()}</Text>
       {renderContent()}
-    </View>
+    </Animated.View>
   );
 };
 

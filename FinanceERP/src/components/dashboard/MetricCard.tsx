@@ -1,5 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import { useIntegerCountUp, useCurrencyCountUp } from '../../hooks/useCountUp';
+import { useInView } from '../../hooks/useInView';
 
 const screenWidth = Dimensions.get('window').width;
 const isTablet = screenWidth > 768;
@@ -11,6 +13,8 @@ interface MetricCardProps {
   badgeColor?: string;
   valueColor?: string;
   icon?: string;
+  isCurrency?: boolean; // Novo: indica se é valor monetário
+  animationDuration?: number; // Duração da animação em ms
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({
@@ -19,10 +23,72 @@ const MetricCard: React.FC<MetricCardProps> = ({
   badgeText,
   badgeColor = '#D4EDDA',
   valueColor = '#2C3E50',
+  isCurrency = false,
+  animationDuration = 1500,
 }) => {
+  // Detectar quando elemento entra na viewport
+  const [ref, isInView] = useInView({ threshold: 0.2, triggerOnce: true });
+
+  // Animações de entrada
+  const [scaleAnim] = useState(new Animated.Value(0.8));
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    if (isInView && !shouldAnimate) {
+      setShouldAnimate(true);
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isInView]);
+
+  // Converter valor para número se for string
+  const numericValue = typeof value === 'string' 
+    ? parseFloat(value.replace(/[^0-9.-]/g, '')) || 0
+    : value;
+
+  // SEMPRE chamar os hooks (não pode ser condicional)
+  // Mas usar valores diferentes baseado em shouldAnimate
+  const animatedCurrency = useCurrencyCountUp(
+    shouldAnimate ? numericValue : 0, 
+    animationDuration
+  );
+  const animatedInteger = useIntegerCountUp(
+    shouldAnimate ? numericValue : 0, 
+    animationDuration
+  );
+
+  // Escolher qual valor usar
+  const animatedValue = isCurrency ? animatedCurrency : animatedInteger;
+
+  // Se o valor original era string e não numérico, usar o valor original
+  const displayValue = typeof value === 'string' && isNaN(parseFloat(value.replace(/[^0-9.-]/g, '')))
+    ? value
+    : animatedValue;
+
   return (
-    <View style={styles.card}>
-      <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
+    <Animated.View 
+      ref={ref}
+      style={[
+        styles.card,
+        {
+          opacity: fadeAnim,
+          transform: [{ scale: scaleAnim }],
+        },
+      ]}
+    >
+      <Text style={[styles.value, { color: valueColor }]}>{displayValue}</Text>
       <Text style={styles.title}>{title}</Text>
       
       {badgeText && (
@@ -30,7 +96,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
           <Text style={styles.badgeText}>{badgeText}</Text>
         </View>
       )}
-    </View>
+    </Animated.View>
   );
 };
 

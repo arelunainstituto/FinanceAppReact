@@ -1,5 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import { useCountUp } from '../../hooks/useCountUp';
+import { useInView } from '../../hooks/useInView';
 
 const screenWidth = Dimensions.get('window').width;
 const isTablet = screenWidth > 768;
@@ -15,46 +17,95 @@ const QuickStats: React.FC<QuickStatsProps> = ({
   avgRevenuePerContract,
   monthlyGrowth,
 }) => {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // Detectar quando elemento entra na viewport
+  const [ref, isInView] = useInView({ threshold: 0.2, triggerOnce: true });
 
-  const formatPercent = (value: number) => {
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
+  // Animações de fade-in e slide-up
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(30));
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    if (isInView && !shouldAnimate) {
+      setShouldAnimate(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isInView]);
+
+  // SEMPRE chamar os hooks (não pode ser condicional)
+  // Mas usar valores diferentes baseado em shouldAnimate
+  const animatedDefaultRate = useCountUp({
+    start: 0,
+    end: shouldAnimate ? defaultRate : 0,
+    duration: 1800,
+    decimals: 1,
+    suffix: '%',
+  });
+
+  const animatedAvgRevenue = useCountUp({
+    start: 0,
+    end: shouldAnimate ? avgRevenuePerContract : 0,
+    duration: 2000,
+    decimals: 0,
+    prefix: '€',
+  });
+
+  const animatedGrowth = useCountUp({
+    start: 0,
+    end: shouldAnimate ? Math.abs(monthlyGrowth) : 0,
+    duration: 1800,
+    decimals: 1,
+    prefix: monthlyGrowth >= 0 ? '+' : '-',
+    suffix: '%',
+  });
 
   return (
-    <View style={styles.container}>
+    <Animated.View
+      ref={ref} 
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
       <Text style={styles.title}>Indicadores Rápidos</Text>
       
       <View style={styles.statsGrid}>
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: defaultRate > 10 ? '#DC3545' : '#28A745' }]}>
-            {defaultRate.toFixed(1)}%
+            {animatedDefaultRate}
           </Text>
           <Text style={styles.statLabel}>Taxa de Inadimplência</Text>
         </View>
 
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: '#007AFF' }]}>
-            {formatCurrency(avgRevenuePerContract)}
+            {animatedAvgRevenue}
           </Text>
           <Text style={styles.statLabel}>Receita Média/Contrato</Text>
         </View>
 
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: monthlyGrowth >= 0 ? '#28A745' : '#DC3545' }]}>
-            {formatPercent(monthlyGrowth)}
+            {animatedGrowth}
           </Text>
           <Text style={styles.statLabel}>Crescimento Mensal</Text>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

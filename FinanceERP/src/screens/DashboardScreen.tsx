@@ -183,13 +183,17 @@ const DashboardScreen: React.FC = () => {
               badgeText="+32%"
               badgeColor="#D4EDDA"
               valueColor="#2C3E50"
+              isCurrency={false}
+              animationDuration={1500}
             />
             <MetricCard
               title="TOTAL RECEBIDO"
-              value={formatCurrencyCompact(data.stats?.totalReceived || 0)}
+              value={data.stats?.totalReceived || 0}
               badgeText="+8%"
               badgeColor="#D1ECF1"
               valueColor="#28A745"
+              isCurrency={true}
+              animationDuration={2000}
             />
             <MetricCard
               title="CONTRATOS ATIVOS"
@@ -197,6 +201,8 @@ const DashboardScreen: React.FC = () => {
               badgeText="+5"
               badgeColor="#CCE5FF"
               valueColor="#007BFF"
+              isCurrency={false}
+              animationDuration={1500}
             />
             <MetricCard
               title="PAGAMENTOS PENDENTES"
@@ -204,6 +210,8 @@ const DashboardScreen: React.FC = () => {
               badgeText="-3"
               badgeColor="#FFF3CD"
               valueColor="#FD7E14"
+              isCurrency={false}
+              animationDuration={1500}
             />
           </View>
 
