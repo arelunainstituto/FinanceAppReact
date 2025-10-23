@@ -7,13 +7,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Payment } from '../types';
 import ApiService from '../services/api';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
 import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
 import ActionButton from '../components/common/ActionButton';
@@ -91,14 +91,23 @@ const PaymentsScreen: React.FC = () => {
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
 
+  // Load payments on mount
+  useEffect(() => {
+    loadPayments();
+  }, []);
+
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
-  // Load payments when page or filters change
+  // Load payments with debounce for search query to avoid excessive API calls
   useEffect(() => {
-    loadPayments();
+    const delayDebounceFn = setTimeout(() => {
+      loadPayments();
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(delayDebounceFn);
   }, [currentPage, activeFilter, searchQuery, contractId, advancedFilters, itemsPerPage]);
 
   const loadPayments = async () => {
@@ -787,13 +796,24 @@ const PaymentsScreen: React.FC = () => {
           </View>
 
           <View style={styles.searchContainer}>
-            <Input
-              placeholder={contractId ? "Pesquisa desabilitada - a mostrar apenas pagamentos do contrato seleccionado" : "Buscar por nome do cliente, número do contrato ou ID do pagamento..."}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              containerStyle={styles.searchInput}
-              editable={!contractId}
-            />
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchTextInput}
+                placeholder={contractId ? "Buscar pagamentos deste contrato..." : "Buscar por nome do cliente, número do contrato ou ID do pagamento..."}
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearSearchButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
             
             <TouchableOpacity
               style={styles.filterButton}
@@ -1009,6 +1029,29 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     marginBottom: 0,
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#334155',
+    outlineStyle: 'none',
+  },
+  clearSearchButton: {
+    padding: 4,
   },
   filtersContainer: {
     marginBottom: 20,

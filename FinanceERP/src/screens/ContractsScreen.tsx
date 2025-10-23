@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -14,7 +15,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Contract } from '../types';
 import ApiService from '../services/api';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
 import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
 import ActionButton from '../components/common/ActionButton';
@@ -606,12 +606,25 @@ useEffect(() => {
           </View>
 
           <View style={styles.searchContainer}>
-            <Input
-              placeholder="Procurar por título do contrato..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              containerStyle={styles.searchInput}
-            />
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchTextInput}
+                placeholder="Procurar por título do contrato..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearSearchButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
@@ -754,8 +767,28 @@ const styles = StyleSheet.create({
   searchContainer: {
     marginBottom: 20,
   },
-  searchInput: {
-    marginBottom: 0,
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#334155',
+    outlineStyle: 'none',
+  },
+  clearSearchButton: {
+    padding: 4,
   },
   filtersContainer: {
     marginBottom: 20,

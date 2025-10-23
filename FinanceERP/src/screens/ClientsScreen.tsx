@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -14,7 +15,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Client } from '../types';
 import ApiService from '../services/api';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
 import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
 import StatusBadge from '../components/common/StatusBadge';
@@ -73,9 +73,20 @@ const ClientsScreen: React.FC = () => {
     }
   }, [totalPages, currentPage]);
 
+  // Load clients on mount
   useEffect(() => {
     loadClients();
-  }, [appliedFilters, searchQuery]); // Add searchQuery as dependency
+  }, []);
+
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    // Skip initial load as it's handled by the mount effect
+    const delayDebounceFn = setTimeout(() => {
+      loadClients();
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, appliedFilters]); // searchQuery with debounce
 
   // Remove the local filtering useEffect since we're now filtering on backend
   // useEffect(() => {
@@ -519,7 +530,26 @@ const ClientsScreen: React.FC = () => {
             </View>
           </View>
 
-          <View style={styles.filtersRow}>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchTextInput}
+                placeholder="Pesquisar por nome, email ou NIF..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearSearchButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowAdvancedFilters(true)}
@@ -541,10 +571,6 @@ const ClientsScreen: React.FC = () => {
             sortColumn={sortColumn}
             sortDirection={sortDirection}
             keyExtractor={(item) => item.id}
-            showGlobalSearch={true}
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder="Pesquisar clientes..."
             actions={(client: Client) => (
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <ActionButton
@@ -631,6 +657,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
     letterSpacing: -0.5,
+  },
+  searchContainer: {
+    marginBottom: 20,
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#334155',
+    outlineStyle: 'none',
+  },
+  clearSearchButton: {
+    padding: 4,
   },
   filtersRow: {
     flexDirection: 'row',
