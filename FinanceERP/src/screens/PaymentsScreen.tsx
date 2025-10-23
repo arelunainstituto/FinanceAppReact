@@ -288,9 +288,52 @@ const PaymentsScreen: React.FC = () => {
   const handleSort = (column: string, direction: 'asc' | 'desc') => {
     setSortColumn(column);
     setSortDirection(direction);
-    // Note: Sorting will be handled by backend in future implementation
-    // For now, we'll reload data to reset any client-side sorting
-    loadPayments();
+    
+    const sortedPayments = [...payments].sort((a, b) => {
+      let aValue = a[column as keyof Payment] as any;
+      let bValue = b[column as keyof Payment] as any;
+      
+      // Handle null/undefined values - put them at the end
+      if (aValue === null || aValue === undefined) {
+        return direction === 'asc' ? 1 : -1;
+      }
+      if (bValue === null || bValue === undefined) {
+        return direction === 'asc' ? -1 : 1;
+      }
+      
+      // Handle string values (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      // Handle numeric comparison (amount, paid_amount, etc)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        if (direction === 'asc') {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      }
+      
+      // Handle date comparison
+      if (column === 'due_date' || column === 'paid_date' || column === 'created_at') {
+        const dateA = new Date(aValue).getTime();
+        const dateB = new Date(bValue).getTime();
+        if (!isNaN(dateA) && !isNaN(dateB)) {
+          return direction === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+      }
+      
+      // Handle other types
+      if (direction === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+    
+    setPayments(sortedPayments);
   };
 
   const handleCreatePayment = () => {

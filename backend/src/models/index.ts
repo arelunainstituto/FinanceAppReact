@@ -24,6 +24,7 @@ export interface Client {
   notes?: string;
   status?: string;
   external_id?: string;
+  rating?: number; // Client rating from 1 to 5 stars
   created_at: Date;
   updated_at: Date;
 }

@@ -24,6 +24,7 @@ import ClientForm from '../components/forms/ClientForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ClientAdvancedFilters from '../components/filters/ClientAdvancedFilters';
 import PaginationControls from '../components/common/PaginationControls';
+import StarRating from '../components/common/StarRating';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportClientsToCSV } from '../utils/csvExport';
 
@@ -244,13 +245,34 @@ const ClientsScreen: React.FC = () => {
     setSortColumn(column);
     setSortDirection(direction);
     
-    const sortedClients = [...clients].sort((a, b) => {
+    const sortedClients = [...filteredClients].sort((a, b) => {
       let aValue = a[column as keyof Client] as any;
       let bValue = b[column as keyof Client] as any;
       
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      // Handle null/undefined values - put them at the end
+      if (aValue === null || aValue === undefined) {
+        return direction === 'asc' ? 1 : -1;
+      }
+      if (bValue === null || bValue === undefined) {
+        return direction === 'asc' ? -1 : 1;
+      }
       
+      // Handle string values (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      // Handle numeric comparison (including rating)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        if (direction === 'asc') {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      }
+      
+      // Handle other types
       if (direction === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -258,7 +280,7 @@ const ClientsScreen: React.FC = () => {
       }
     });
     
-    setClients(sortedClients);
+    setFilteredClients(sortedClients);
     setCurrentPage(1); // Reset to first page after sorting
   };
 
@@ -345,6 +367,20 @@ const ClientsScreen: React.FC = () => {
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  const handleRatingChange = async (clientId: string, newRating: number) => {
+    try {
+      const response = await ApiService.updateClientRating(clientId, newRating);
+      if (response.success && response.data) {
+        // Update local state
+        setClients(clients.map(c => c.id === clientId ? { ...c, rating: newRating } : c));
+        setFilteredClients(filteredClients.map(c => c.id === clientId ? { ...c, rating: newRating } : c));
+      }
+    } catch (error) {
+      console.error('Error updating client rating:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a avaliação do cliente');
+    }
   };
 
   const renderPaginationControls = () => {
@@ -453,7 +489,7 @@ const ClientsScreen: React.FC = () => {
       title: 'Nome',
       sortable: true,
       align: 'left',
-      width: '28%',
+      width: '24%',
       render: (client: Client) => {
         const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'N/A';
         return (
@@ -471,7 +507,7 @@ const ClientsScreen: React.FC = () => {
       title: 'Email',
       sortable: true,
       align: 'left',
-      width: '30%',
+      width: '24%',
       render: (client: Client) => (
         <Text style={{ fontSize: 14, color: '#64748B' }}>
           {client.email || '-'}
@@ -483,7 +519,7 @@ const ClientsScreen: React.FC = () => {
       title: 'NIF',
       sortable: true,
       align: 'left',
-      width: '18%',
+      width: '14%',
       render: (client: Client) => (
         <Text style={{ fontSize: 14, color: '#64748B' }}>
           {client.tax_id || '-'}
@@ -491,11 +527,28 @@ const ClientsScreen: React.FC = () => {
       ),
     },
     {
+      key: 'rating',
+      title: 'Rating',
+      sortable: true,
+      align: 'left',
+      width: '16%',
+      render: (client: Client) => (
+        <View onStartShouldSetResponder={() => true}>
+          <StarRating
+            rating={client.rating || 0}
+            onRatingChange={(newRating) => handleRatingChange(client.id, newRating)}
+            size={18}
+            editable={true}
+          />
+        </View>
+      ),
+    },
+    {
       key: 'status',
       title: 'Status',
       sortable: true,
       align: 'left',
-      width: '16%',
+      width: '14%',
       render: (client: Client) => (
         <StatusBadge 
           label={client.status.toUpperCase()} 
