@@ -190,7 +190,26 @@ export class ClientRepository {
           // Filtro de busca por nome, email ou tax_id
           if (filters.search && filters.search.trim()) {
             const searchTerm = filters.search.trim();
-            batchQuery = batchQuery.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
+            const searchParts = searchTerm.split(/\s+/); // Dividir por espaços
+            
+            if (searchParts.length > 1) {
+              // Se tem múltiplas palavras, buscar por nome E sobrenome
+              const firstName = searchParts[0];
+              const lastName = searchParts.slice(1).join(' ');
+              
+              // Buscar onde first_name contém a primeira palavra E last_name contém as outras
+              // OU buscar nos outros campos
+              batchQuery = batchQuery.or(
+                `and(first_name.ilike.%${firstName}%,last_name.ilike.%${lastName}%),` +
+                `first_name.ilike.%${searchTerm}%,` +
+                `last_name.ilike.%${searchTerm}%,` +
+                `email.ilike.%${searchTerm}%,` +
+                `tax_id.ilike.%${searchTerm}%`
+              );
+            } else {
+              // Se é uma palavra só, buscar normalmente
+              batchQuery = batchQuery.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
+            }
           }
 
           batchQuery = batchQuery.order('created_at', { ascending: false });
@@ -215,7 +234,26 @@ export class ClientRepository {
         // Filtro de busca por nome, email ou tax_id
         if (filters.search && filters.search.trim()) {
           const searchTerm = filters.search.trim();
-          query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
+          const searchParts = searchTerm.split(/\s+/); // Dividir por espaços
+          
+          if (searchParts.length > 1) {
+            // Se tem múltiplas palavras, buscar por nome E sobrenome
+            const firstName = searchParts[0];
+            const lastName = searchParts.slice(1).join(' ');
+            
+            // Buscar onde first_name contém a primeira palavra E last_name contém as outras
+            // OU buscar nos outros campos
+            query = query.or(
+              `and(first_name.ilike.%${firstName}%,last_name.ilike.%${lastName}%),` +
+              `first_name.ilike.%${searchTerm}%,` +
+              `last_name.ilike.%${searchTerm}%,` +
+              `email.ilike.%${searchTerm}%,` +
+              `tax_id.ilike.%${searchTerm}%`
+            );
+          } else {
+            // Se é uma palavra só, buscar normalmente
+            query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,tax_id.ilike.%${searchTerm}%`);
+          }
         }
 
         query = query.order('created_at', { ascending: false });

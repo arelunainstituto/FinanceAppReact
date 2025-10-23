@@ -270,7 +270,11 @@ export class PaymentRepository {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allPayments = allPayments.concat(data);
+          // FILTRO CRÍTICO: Apenas adicionar pagamentos com contrato e cliente válidos
+          const validPayments = data.filter(payment => 
+            payment.contract && payment.contract.client
+          );
+          allPayments = allPayments.concat(validPayments);
           offset += batchSize;
           hasMoreData = data.length === batchSize;
         } else {
@@ -443,11 +447,16 @@ export class PaymentRepository {
 
         if (error) throw error;
 
+        // FILTRO CRÍTICO: Remover pagamentos órfãos (sem contrato ou cliente válido)
+        const validPayments = (data || []).filter(payment => 
+          payment.contract && payment.contract.client
+        );
+
         const total = count || 0;
         const totalPages = Math.ceil(total / limit);
 
         return {
-          data: data || [],
+          data: validPayments,
           total,
           page,
           limit,
@@ -669,6 +678,11 @@ export class PaymentRepository {
           if (data) {
             data.forEach(payment => {
               if (!seenIds.has(payment.id)) {
+                // FILTRO CRÍTICO: Apenas incluir pagamentos com contrato E cliente válidos
+                if (!payment.contract || !payment.contract.client) {
+                  return; // Pular pagamentos órfãos
+                }
+                
                 // Aplicar outros filtros
                 let includePayment = true;
                 
@@ -734,11 +748,16 @@ export class PaymentRepository {
 
       if (error) throw error;
 
+      // FILTRO CRÍTICO: Remover pagamentos órfãos (sem contrato ou cliente válido)
+      const validPayments = (data || []).filter(payment => 
+        payment.contract && payment.contract.client
+      );
+
       const total = count || 0;
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: data || [],
+        data: validPayments,
         total,
         page,
         limit,

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -14,9 +15,11 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Client } from '../types';
 import ApiService from '../services/api';
 import Button from '../components/common/Button';
-import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
-import DataTable, { DataTableColumn } from '../components/DataTable';
+import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
+import StatusBadge from '../components/common/StatusBadge';
+import Avatar from '../components/common/Avatar';
+import ActionButton from '../components/common/ActionButton';
 import ClientForm from '../components/forms/ClientForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ClientAdvancedFilters from '../components/filters/ClientAdvancedFilters';
@@ -70,9 +73,20 @@ const ClientsScreen: React.FC = () => {
     }
   }, [totalPages, currentPage]);
 
+  // Load clients on mount
   useEffect(() => {
     loadClients();
-  }, [appliedFilters, searchQuery]); // Add searchQuery as dependency
+  }, []);
+
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    // Skip initial load as it's handled by the mount effect
+    const delayDebounceFn = setTimeout(() => {
+      loadClients();
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, appliedFilters]); // searchQuery with debounce
 
   // Remove the local filtering useEffect since we're now filtering on backend
   // useEffect(() => {
@@ -433,65 +447,60 @@ const ClientsScreen: React.FC = () => {
     );
   };
 
-  const renderStatusBadge = (status: string) => (
-    <View style={[
-      styles.statusBadge,
-      status === 'ativo' ? styles.activeBadge : styles.inactiveBadge
-    ]}>
-      <Text style={[
-        styles.statusText,
-        { color: status === 'ativo' ? '#16A34A' : '#DC2626' }
-      ]}>
-        {status}
-      </Text>
-    </View>
-  );
-
-  const columns: DataTableColumn[] = [
+  const columns: UltimaTableColumn[] = [
     {
       key: 'first_name',
       title: 'Nome',
       sortable: true,
-      render: (client: Client) => (
-        <Text style={{ fontSize: 14, color: '#374151', fontWeight: '500' }}>
-          {client.first_name || 'N/A'}
-        </Text>
-      ),
+      align: 'left',
+      width: '28%',
+      render: (client: Client) => {
+        const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'N/A';
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Avatar name={fullName} size={36} />
+            <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500', flex: 1 }}>
+              {fullName}
+            </Text>
+          </View>
+        );
+      },
     },
     {
       key: 'email',
       title: 'Email',
       sortable: true,
+      align: 'left',
+      width: '30%',
+      render: (client: Client) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }}>
+          {client.email || '-'}
+        </Text>
+      ),
     },
-
+    {
+      key: 'tax_id',
+      title: 'NIF',
+      sortable: true,
+      align: 'left',
+      width: '18%',
+      render: (client: Client) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }}>
+          {client.tax_id || '-'}
+        </Text>
+      ),
+    },
     {
       key: 'status',
       title: 'Status',
       sortable: true,
-      width: isTablet ? 80 : 60,
-      render: (client: Client, status: string) => renderStatusBadge(status),
-    },
-
-    {
-      key: 'actions',
-      title: 'Ações',
-      sortable: false,
-      width: isTablet ? 100 : 80,
+      align: 'left',
+      width: '16%',
       render: (client: Client) => (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => handleEditClient(client)}
-          >
-            <Ionicons name="pencil" size={16} color="#007BFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteClient(client)}
-          >
-            <Ionicons name="trash" size={16} color="#DC3545" />
-          </TouchableOpacity>
-        </View>
+        <StatusBadge 
+          label={client.status.toUpperCase()} 
+          variant={client.status === 'ativo' ? 'success' : 'default'}
+        />
       ),
     },
   ];
@@ -522,12 +531,25 @@ const ClientsScreen: React.FC = () => {
           </View>
 
           <View style={styles.searchContainer}>
-            <Input
-              placeholder="Procurar por nome do cliente..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              containerStyle={styles.searchInput}
-            />
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchTextInput}
+                placeholder="Pesquisar por nome, email ou NIF..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearSearchButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+            
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowAdvancedFilters(true)}
@@ -540,7 +562,7 @@ const ClientsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          <DataTable
+          <UltimaTable
             data={getCurrentPageData()}
             columns={columns}
             loading={isLoading}
@@ -549,6 +571,22 @@ const ClientsScreen: React.FC = () => {
             sortColumn={sortColumn}
             sortDirection={sortDirection}
             keyExtractor={(item) => item.id}
+            actions={(client: Client) => (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ActionButton
+                  icon="pencil"
+                  onPress={() => handleEditClient(client)}
+                  variant="secondary"
+                  size={18}
+                />
+                <ActionButton
+                  icon="trash"
+                  onPress={() => handleDeleteClient(client)}
+                  variant="danger"
+                  size={18}
+                />
+              </View>
+            )}
           />
 
           <PaginationControls
@@ -623,8 +661,33 @@ const styles = StyleSheet.create({
   searchContainer: {
     marginBottom: 20,
   },
-  searchInput: {
-    marginBottom: 0,
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#334155',
+    outlineStyle: 'none',
+  },
+  clearSearchButton: {
+    padding: 4,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    gap: 12,
   },
   statusBadge: {
     paddingHorizontal: 12,
