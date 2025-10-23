@@ -22,6 +22,34 @@ export class PaymentController {
     }
   };
 
+  getRecentPayments = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const payments = await this.paymentService.getRecentPayments(5);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Recent payments retrieved successfully',
+        data: payments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getUpcomingPayments = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const payments = await this.paymentService.getUpcomingPayments(5);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Upcoming payments retrieved successfully',
+        data: payments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getAllPaymentsForExport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Extrair filtros dos query parameters
@@ -345,6 +373,42 @@ export class PaymentController {
       console.log('✅ Response sent successfully');
     } catch (error) {
       console.log('❌ Error in processManualPayment:', error);
+      next(error);
+    }
+  };
+
+  importPaymentsFromExcel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      console.log('📥 importPaymentsFromExcel called');
+      
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: 'No file uploaded',
+        });
+        return;
+      }
+
+      console.log('📄 File uploaded:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+
+      const result = await this.paymentService.processExcelImport(req.file.buffer);
+      
+      console.log('✅ Import completed:', {
+        successCount: result.success.length,
+        errorCount: result.errors.length
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: `Importação concluída. ${result.success.length} pagamento(s) processado(s) com sucesso, ${result.errors.length} erro(s).`,
+        data: result,
+      });
+    } catch (error) {
+      console.log('❌ Error in importPaymentsFromExcel:', error);
       next(error);
     }
   };

@@ -3,26 +3,38 @@ import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '..
 
 // API Configuration - Dynamic URL based on current domain
 const getApiBaseUrl = () => {
-  // Use environment variable if available (prioritize for development)
+  // PRIORITY 1: Use environment variable if available (for all environments)
   if (process.env.REACT_APP_API_BASE_URL) {
     console.log('🌐 Using API URL from environment:', process.env.REACT_APP_API_BASE_URL);
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
-  // For web deployment, use same domain as frontend (only in production)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-    console.log('🌐 Using production API URL:', `${window.location.origin}/api`);
-    return `${window.location.origin}/api`;
+  // PRIORITY 2: Check if we're in a browser
+  if (typeof window !== 'undefined') {
+    const currentUrl = window.location.origin;
+    
+    // Development: localhost
+    if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+      console.log('🌐 Using localhost API URL: http://localhost:3000/api');
+      return 'http://localhost:3000/api';
+    }
+    
+    // Production: Use same domain as frontend ONLY for main production domain
+    // This allows Vercel preview branches to work correctly with environment variables
+    if (currentUrl.includes('financeiro.institutoareluna.pt')) {
+      console.log('🌐 Using production API URL:', `${currentUrl}/api`);
+      return `${currentUrl}/api`;
+    }
+    
+    // Vercel preview/production (financeapp-*.vercel.app): Use same domain
+    if (currentUrl.includes('vercel.app')) {
+      console.log('🌐 Using Vercel deployment API URL:', `${currentUrl}/api`);
+      return `${currentUrl}/api`;
+    }
   }
   
-  // Development fallback - use localhost backend
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('🌐 Using development fallback API URL: http://localhost:3000/api');
-    return 'http://localhost:3000/api';
-  }
-  
-  // Fallback for server-side rendering or React Native - use fixed domain
-  console.log('🌐 Using production fallback API URL: https://financeiro.institutoareluna.pt/api');
+  // PRIORITY 3: Fallback for server-side rendering or React Native
+  console.log('🌐 Using fallback API URL: https://financeiro.institutoareluna.pt/api');
   return 'https://financeiro.institutoareluna.pt/api';
 };
 
@@ -297,6 +309,55 @@ class ApiService {
     });
   }
 
+  async importPaymentsFromExcel(file: File | { uri: string; name: string; type: string }): Promise<ApiResponse<{
+    success: {
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+      paymentId: string;
+    }[];
+    errors: {
+      row: number;
+      clientName?: string;
+      amount?: number;
+      error: string;
+    }[];
+  }>> {
+    const token = await AsyncStorage.getItem('auth_token');
+    
+    const formData = new FormData();
+    
+    // Check if it's a File object (web) or React Native file object
+    if (file instanceof File) {
+      formData.append('file', file);
+    } else {
+      // React Native file object
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      } as any);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/payments/import`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        // Don't set Content-Type, let the browser set it with the boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('🌐 Error response:', errorText);
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
   async processManualPayment(id: string, amount: number, usePositiveBalance?: number, paymentMethod?: string): Promise<ApiResponse<{
     payment: Payment;
     newPayment?: Payment;
@@ -312,6 +373,18 @@ class ApiService {
   // Dashboard methods
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
     return this.request<DashboardStats>('/dashboard/stats');
+  }
+
+  async getRecentPayments(): Promise<ApiResponse<Payment[]>> {
+    return this.request<Payment[]>('/payments/recent');
+  }
+
+  async getUpcomingPayments(): Promise<ApiResponse<Payment[]>> {
+    return this.request<Payment[]>('/payments/upcoming');
+  }
+
+  async getRecentContracts(): Promise<ApiResponse<Contract[]>> {
+    return this.request<Contract[]>('/contracts/recent');
   }
 
   async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {

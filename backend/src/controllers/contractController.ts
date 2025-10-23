@@ -8,6 +8,20 @@ export class ContractController {
     this.contractService = new ContractService();
   }
 
+  getRecentContracts = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const contracts = await this.contractService.getRecentContracts(5);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Recent contracts retrieved successfully',
+        data: contracts,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getAllContracts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const page = parseInt(req.query.page as string) || 1;

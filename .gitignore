@@ -1,13 +1,21 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+*.log
+.expo/
+.expo-shared/
+
 # Trae IDE
 .trae/
 *.trae
+
+# Vercel
 .vercel
-DEPLOY-GUIDE.md
-deploy.sh
-backend/check-payment-methods.js
-backend/check-payment-methods.js
-.DS_Store
-db_backup/db_cluster-17-10-2025@01-03-28.backup.gz
 
 # Environment variables - Local development
 .env
@@ -20,7 +28,31 @@ db_backup/db_cluster-17-10-2025@01-03-28.backup.gz
 # Keep production env files for deployment
 !.env.production
 !.env.vercel.production
-test-auth.js
-SEGURANCA_CORS.md
-.gitignore
-test-cors-security.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups and sensitive data
+db_backup/*.backup.gz
+db_backup/dados stripe.xlsx
+
+# Test and diagnostic files (already removed)
+test-*.js
+diagnose-*.js
+*-test.js
+criar_planilha*.js
+rollback*.js
+clear-auth-cache.html
+fix-local-auth.html
+teste_importacao_manual.md
+
+# Deployment
+DEPLOY-GUIDE.md
+deploy.sh
+
+# Temporary guides and scripts
+GUIA_VARIAVEIS_VERCEL.md
+verificar-env-vercel.sh
+db_backup/teste_importacao_5_pagamentos_reais.xlsx
+CORRECAO_API_URL.md

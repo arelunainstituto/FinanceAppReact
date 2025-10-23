@@ -68,6 +68,64 @@ export class PaymentRepository {
     }
   }
 
+  async findRecent(limit: number = 5): Promise<Payment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          contract:contracts(
+            *,
+            client:clients(*)
+          )
+        `)
+        .eq('status', 'paid') // Só pagamentos pagos
+        .not('paid_date', 'is', null) // Filtrar paid_date nulo
+        .order('updated_at', { ascending: false }) // CORRIGIDO: Ordenar por updated_at (últimas parcelas marcadas como pagas)
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching recent payments:', error);
+        throw new Error('Failed to fetch recent payments');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching recent payments:', error);
+      throw new Error('Failed to fetch recent payments');
+    }
+  }
+
+  async findUpcoming(limit: number = 5): Promise<Payment[]> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('payments')
+        .select(`
+          *,
+          contract:contracts(
+            *,
+            client:clients(*)
+          )
+        `)
+        .eq('status', 'pending')
+        .gte('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching upcoming payments:', error);
+        throw new Error('Failed to fetch upcoming payments');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching upcoming payments:', error);
+      throw new Error('Failed to fetch upcoming payments');
+    }
+  }
+
   async findAllForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
     try {
       const { 
@@ -212,7 +270,11 @@ export class PaymentRepository {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allPayments = allPayments.concat(data);
+          // FILTRO CRÍTICO: Apenas adicionar pagamentos com contrato e cliente válidos
+          const validPayments = data.filter(payment => 
+            payment.contract && payment.contract.client
+          );
+          allPayments = allPayments.concat(validPayments);
           offset += batchSize;
           hasMoreData = data.length === batchSize;
         } else {
@@ -385,11 +447,16 @@ export class PaymentRepository {
 
         if (error) throw error;
 
+        // FILTRO CRÍTICO: Remover pagamentos órfãos (sem contrato ou cliente válido)
+        const validPayments = (data || []).filter(payment => 
+          payment.contract && payment.contract.client
+        );
+
         const total = count || 0;
         const totalPages = Math.ceil(total / limit);
 
         return {
-          data: data || [],
+          data: validPayments,
           total,
           page,
           limit,
@@ -611,6 +678,11 @@ export class PaymentRepository {
           if (data) {
             data.forEach(payment => {
               if (!seenIds.has(payment.id)) {
+                // FILTRO CRÍTICO: Apenas incluir pagamentos com contrato E cliente válidos
+                if (!payment.contract || !payment.contract.client) {
+                  return; // Pular pagamentos órfãos
+                }
+                
                 // Aplicar outros filtros
                 let includePayment = true;
                 
@@ -676,11 +748,16 @@ export class PaymentRepository {
 
       if (error) throw error;
 
+      // FILTRO CRÍTICO: Remover pagamentos órfãos (sem contrato ou cliente válido)
+      const validPayments = (data || []).filter(payment => 
+        payment.contract && payment.contract.client
+      );
+
       const total = count || 0;
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: data || [],
+        data: validPayments,
         total,
         page,
         limit,

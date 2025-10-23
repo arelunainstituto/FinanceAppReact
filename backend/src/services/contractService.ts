@@ -19,6 +19,10 @@ export class ContractService {
     return this.contractRepository.findAll();
   }
 
+  async getRecentContracts(limit: number = 5): Promise<Contract[]> {
+    return this.contractRepository.findRecent(limit);
+  }
+
   async getAllContractsPaginated(options: PaginationOptions = {}, filters: ContractFilters = {}): Promise<PaginatedResult<Contract>> {
     return this.contractRepository.findAllPaginated(options, filters);
   }

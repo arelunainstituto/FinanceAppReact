@@ -1,20 +1,32 @@
 import { PaymentRepository, PaginationOptions, PaginatedResult, PaymentFilters } from '../repositories/paymentRepository';
 import { ContractRepository } from '../repositories/contractRepository';
+import { ClientRepository } from '../repositories/clientRepository';
 import { Payment } from '../models';
 import { createError } from '../middlewares/errorHandler';
 import { getCurrentOrLastBusinessDay } from '../utils/dateUtils';
+import * as XLSX from 'xlsx';
 
 export class PaymentService {
   private paymentRepository: PaymentRepository;
   private contractRepository: ContractRepository;
+  private clientRepository: ClientRepository;
 
   constructor() {
     this.paymentRepository = new PaymentRepository();
     this.contractRepository = new ContractRepository();
+    this.clientRepository = new ClientRepository();
   }
 
   async getAllPayments(): Promise<Payment[]> {
     return this.paymentRepository.findAll();
+  }
+
+  async getRecentPayments(limit: number = 5): Promise<Payment[]> {
+    return this.paymentRepository.findRecent(limit);
+  }
+
+  async getUpcomingPayments(limit: number = 5): Promise<Payment[]> {
+    return this.paymentRepository.findUpcoming(limit);
   }
 
   async getAllPaymentsForExport(filters: PaymentFilters = {}): Promise<Payment[]> {
@@ -463,5 +475,264 @@ export class PaymentService {
     }
 
     throw createError('Invalid payment amount', 400);
+  }
+
+  async processExcelImport(fileBuffer: Buffer): Promise<{
+    success: {
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+      paymentId: string;
+    }[];
+    errors: {
+      row: number;
+      clientName?: string;
+      amount?: number;
+      error: string;
+    }[];
+  }> {
+    console.log('🚀 processExcelImport CALLED! Buffer size:', fileBuffer.length);
+    
+    const successfulPayments: {
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+      paymentId: string;
+    }[] = [];
+    
+    const errors: {
+      row: number;
+      clientName?: string;
+      amount?: number;
+      error: string;
+    }[] = [];
+
+    try {
+      // Ler arquivo Excel
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw createError('Planilha vazia ou sem abas', 400);
+      }
+      
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Converter para JSON
+      const data: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      if (!data || data.length === 0) {
+        throw createError('Planilha completamente vazia', 400);
+      }
+      
+      if (data.length <= 1) {
+        throw createError('Planilha vazia ou sem dados (apenas cabeçalho)', 400);
+      }
+
+      // Encontrar índices das colunas
+      const headers = data[0] as string[];
+      
+      if (!headers || headers.length === 0) {
+        throw createError('Cabeçalho da planilha vazio', 400);
+      }
+      const descricaoIndex = headers.findIndex(h => 
+        h && h.toLowerCase().includes('descri')
+      );
+      const statusIndex = headers.findIndex(h => 
+        h && (h.toLowerCase() === 'status' || h.toLowerCase() === 'ok')
+      );
+      const amountIndex = headers.findIndex(h => 
+        h && (h.toLowerCase().includes('amount') || h.toLowerCase().includes('valor') || h.toLowerCase().includes('total'))
+      );
+
+      if (descricaoIndex === -1) {
+        throw createError('Coluna "Descrição" não encontrada na planilha', 400);
+      }
+
+      if (statusIndex === -1) {
+        throw createError('Coluna "Status" não encontrada na planilha', 400);
+      }
+
+      // ⚡ OTIMIZAÇÃO: Cache de dados para evitar queries repetidas
+      console.log('📦 Loading all data into cache...');
+      const allClients = await this.clientRepository.findAll();
+      const allContracts = await this.contractRepository.findAll();
+      const allPayments = await this.paymentRepository.findAll();
+      console.log(`📦 Cache loaded: ${allClients.length} clients, ${allContracts.length} contracts, ${allPayments.length} payments`);
+
+      // Processar cada linha (começando da linha 2, pulando o header)
+      console.log(`📊 Processing ${data.length - 1} rows...`);
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i] as any[];
+        
+        if (!row || row.length === 0) continue;
+        
+        try {
+          const descricao = row[descricaoIndex];
+          const status = row[statusIndex];
+          const amountValue = amountIndex !== -1 ? row[amountIndex] : null;
+          
+          // Verificar se contém "SEPA PAYMENT FOR" (case insensitive)
+          if (!descricao || typeof descricao !== 'string' || !descricao.toUpperCase().includes('SEPA PAYMENT FOR')) {
+            continue;
+          }
+          
+          console.log(`✓ Row ${i}: Found SEPA payment, Status: ${status}`);
+          
+          // Verificar se status é APENAS "OK" (não processar "Pendente")
+          const statusUpper = status ? status.toString().toUpperCase() : '';
+          if (!statusUpper || statusUpper !== 'OK') {
+            console.log(`✗ Row ${i}: Status not OK: ${statusUpper} - SKIPPING`);
+            continue;
+          }
+          
+          console.log(`✓ Row ${i}: Status is OK, processing...`);
+
+          
+          // Extrair nome do cliente após "SEPA PAYMENT FOR"
+          const clientNameMatch = descricao.match(/SEPA PAYMENT FOR\s+(.+)/i);
+          if (!clientNameMatch || !clientNameMatch[1]) {
+            errors.push({
+              row: i + 1,
+              error: 'Não foi possível extrair o nome do cliente da descrição'
+            });
+            continue;
+          }
+          
+          const clientName = clientNameMatch[1].trim();
+          
+          // ⚡ Usar cache ao invés de query
+          const client = allClients.find(c => 
+            c.first_name.toLowerCase() === clientName.toLowerCase()
+          );
+          
+          if (!client) {
+            errors.push({
+              row: i + 1,
+              clientName,
+              error: `Cliente "${clientName}" não encontrado no banco de dados`
+            });
+            continue;
+          }
+          
+          // ⚡ Usar cache ao invés de query
+          const clientContracts = allContracts.filter(c => c.client_id === client.id);
+          
+          if (clientContracts.length === 0) {
+            errors.push({
+              row: i + 1,
+              clientName,
+              error: `Cliente "${clientName}" não possui contratos`
+            });
+            continue;
+          }
+          
+          // ⚡ Buscar todos os pagamentos pendentes do cliente em todos os seus contratos (usando cache)
+          let oldestPendingPayment: Payment | null = null;
+          let oldestDueDate: Date | null = null;
+          
+          for (const contract of clientContracts) {
+            const payments = allPayments.filter(p => p.contract_id === contract.id);
+            const pendingPayments = payments.filter(p => p.status === 'pending');
+            
+            for (const payment of pendingPayments) {
+              const dueDate = new Date(payment.due_date);
+              if (!oldestDueDate || dueDate < oldestDueDate) {
+                oldestDueDate = dueDate;
+                oldestPendingPayment = payment;
+              }
+            }
+          }
+          
+          if (!oldestPendingPayment) {
+            errors.push({
+              row: i + 1,
+              clientName,
+              error: `Cliente "${clientName}" não possui pagamentos pendentes`
+            });
+            continue;
+          }
+          
+          // Verificar se o valor bate (se houver valor na planilha)
+          if (amountValue !== null && amountValue !== undefined && amountValue !== '') {
+            let excelAmount: number;
+            
+            if (typeof amountValue === 'number') {
+              excelAmount = Math.abs(amountValue); // Garantir valor positivo
+            } else {
+              // Remover símbolos de moeda (€, R$, $, etc.) e espaços
+              const cleanedValue = amountValue.toString()
+                .replace(/[€$R\s]/g, '')  // Remove €, $, R e espaços
+                .replace(',', '.');         // Troca vírgula por ponto
+              
+              excelAmount = Math.abs(parseFloat(cleanedValue)); // Garantir valor positivo
+            }
+            
+            if (!isNaN(excelAmount)) {
+              // Comparar com tolerância de 0.01 para erros de arredondamento
+              const difference = Math.abs(excelAmount - oldestPendingPayment.amount);
+              if (difference > 0.01) {
+                errors.push({
+                  row: i + 1,
+                  clientName,
+                  amount: excelAmount,
+                  error: `Valor da planilha (R$ ${excelAmount.toFixed(2)}) não corresponde ao valor do pagamento (R$ ${oldestPendingPayment.amount.toFixed(2)})`
+                });
+                continue;
+              }
+            }
+          }
+          
+          // Dar baixa no pagamento com método "Stripe"
+          const businessDay = getCurrentOrLastBusinessDay();
+          const updatedPayment = await this.paymentRepository.update(oldestPendingPayment.id, {
+            status: 'paid',
+            paid_amount: oldestPendingPayment.amount,
+            paid_date: businessDay,
+            payment_method: 'Stripe'
+          });
+          
+          if (!updatedPayment) {
+            errors.push({
+              row: i + 1,
+              clientName,
+              error: 'Erro ao atualizar o pagamento'
+            });
+            continue;
+          }
+          
+          // ⚡ Buscar contrato para obter o número (usando cache)
+          const contract = allContracts.find(c => c.id === oldestPendingPayment.contract_id);
+          
+          successfulPayments.push({
+            clientName,
+            amount: oldestPendingPayment.amount,
+            contractNumber: contract?.contract_number || 'N/A',
+            dueDate: new Date(oldestPendingPayment.due_date).toLocaleDateString('pt-BR'),
+            paymentId: updatedPayment.id
+          });
+          
+        } catch (rowError) {
+          errors.push({
+            row: i + 1,
+            error: `Erro ao processar linha: ${rowError instanceof Error ? rowError.message : 'Erro desconhecido'}`
+          });
+        }
+      }
+      
+      return {
+        success: successfulPayments,
+        errors
+      };
+      
+    } catch (error) {
+      console.error('Error processing Excel import:', error);
+      throw createError(
+        `Erro ao processar planilha: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        500
+      );
+    }
   }
 }

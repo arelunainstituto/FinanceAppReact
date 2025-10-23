@@ -13,11 +13,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuthState();
-  }, []);
-
-  const checkAuthState = useCallback(async () => {
+  const checkAuthState = async () => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       const userData = await AsyncStorage.getItem('user_data');
@@ -42,6 +38,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    checkAuthState();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
