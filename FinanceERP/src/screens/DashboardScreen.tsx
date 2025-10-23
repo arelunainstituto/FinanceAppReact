@@ -215,38 +215,53 @@ const DashboardScreen: React.FC = () => {
             />
           </View>
 
-          {/* Seção 2: Gráficos de Análise */}
+          {/* Seção 2: Gráfico de Receita (Largura Total) */}
           <RevenueChart data={data.stats?.monthlyRevenue || []} />
           
-          <PaymentStatusChart data={data.stats?.paymentsByStatus || []} />
-          
-          <ContractsChart
-            activeContracts={data.stats?.activeContracts || 0}
-            totalContracts={data.stats?.totalContracts || 0}
-          />
+          {/* Seção 3: Gráficos Lado a Lado */}
+          <View style={styles.chartsRow}>
+            <View style={styles.chartHalf}>
+              <PaymentStatusChart data={data.stats?.paymentsByStatus || []} />
+            </View>
+            
+            <View style={styles.chartHalf}>
+              <ContractsChart
+                activeContracts={data.stats?.activeContracts || 0}
+                totalContracts={data.stats?.totalContracts || 0}
+              />
+            </View>
+          </View>
 
-          {/* Seção 3: Indicadores Rápidos */}
+          {/* Seção 4: Indicadores Rápidos */}
           <QuickStats
             defaultRate={metrics.defaultRate}
             avgRevenuePerContract={metrics.avgRevenuePerContract}
             monthlyGrowth={metrics.monthlyGrowth}
           />
 
-          {/* Seção 4: Listas de Atividades */}
-          <RecentActivity
-            type="payments"
-            recentPayments={data.recentPayments}
-          />
+          {/* Seção 5: Atividades Recentes (3 Colunas) */}
+          <View style={styles.activitiesRow}>
+            <View style={styles.activityThird}>
+              <RecentActivity
+                type="payments"
+                recentPayments={data.recentPayments}
+              />
+            </View>
 
-          <RecentActivity
-            type="upcoming"
-            upcomingPayments={data.upcomingPayments}
-          />
+            <View style={styles.activityThird}>
+              <RecentActivity
+                type="upcoming"
+                upcomingPayments={data.upcomingPayments}
+              />
+            </View>
 
-          <RecentActivity
-            type="contracts"
-            recentContracts={data.recentContracts}
-          />
+            <View style={styles.activityThird}>
+              <RecentActivity
+                type="contracts"
+                recentContracts={data.recentContracts}
+              />
+            </View>
+          </View>
         </View>
       </ScrollView>
     </MainLayout>
@@ -292,6 +307,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: isTablet ? 32 : 24,
     gap: isTablet ? 16 : 12,
+  },
+  chartsRow: {
+    flexDirection: isTablet ? 'row' : 'column',
+    gap: isTablet ? 16 : 12,
+    marginBottom: isTablet ? 24 : 16,
+  },
+  chartHalf: {
+    flex: 1,
+    minWidth: isTablet ? '48%' : '100%',
+  },
+  activitiesRow: {
+    flexDirection: isTablet ? 'row' : 'column',
+    gap: isTablet ? 16 : 12,
+    marginTop: isTablet ? 24 : 16,
+  },
+  activityThird: {
+    flex: 1,
+    minWidth: isTablet ? '31%' : '100%',
   },
 });
 

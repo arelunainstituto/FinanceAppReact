@@ -215,8 +215,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: isTablet ? 24 : 16,
-    marginBottom: isTablet ? 24 : 16,
+    padding: isTablet ? 20 : 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -229,16 +228,17 @@ const styles = StyleSheet.create({
     borderColor: '#E9ECEF',
     overflow: 'hidden',
     width: '100%',
+    height: '100%',
   },
   title: {
-    fontSize: isTablet ? 20 : 18,
+    fontSize: isTablet ? 18 : 16,
     fontWeight: '700',
     color: '#2C3E50',
-    marginBottom: isTablet ? 20 : 16,
+    marginBottom: isTablet ? 16 : 12,
     letterSpacing: -0.3,
   },
   chartContainer: {
-    height: 300,
+    height: 280,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',

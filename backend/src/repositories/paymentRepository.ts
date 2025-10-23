@@ -79,7 +79,9 @@ export class PaymentRepository {
             client:clients(*)
           )
         `)
-        .order('created_at', { ascending: false })
+        .eq('status', 'paid') // Só pagamentos pagos
+        .not('paid_date', 'is', null) // Filtrar paid_date nulo
+        .order('updated_at', { ascending: false }) // CORRIGIDO: Ordenar por updated_at (últimas parcelas marcadas como pagas)
         .limit(limit);
 
       if (error) {

@@ -84,12 +84,11 @@ export class DashboardService {
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending'),
         
-        // Pagamentos em atraso (pending com data vencida)
+        // Pagamentos em atraso (status overdue + pending com data vencida)
         supabase
           .from('payments')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .lt('due_date', new Date().toISOString().split('T')[0]),
+          .eq('status', 'overdue'), // CORRIGIDO: buscar overdue direto do banco
         
         // Receita mensal
         this.getMonthlyRevenue(),
@@ -137,43 +136,74 @@ export class DashboardService {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
+      const now = new Date();
+      
       // CORRIGIDO: usar paid_date (não paid_at) e paid_amount (não amount)
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('amount, paid_amount, paid_date')
-        .eq('status', 'paid')
-        .gte('paid_date', sixMonthsAgo.toISOString())
-        .not('paid_date', 'is', null);
+      // E filtrar apenas dados até a data atual
+      // Buscar TODOS os pagamentos sem limite
+      let allPayments: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      const monthlyData: { [key: string]: number } = {};
+      while (hasMore) {
+        const { data: paymentsPage } = await supabase
+          .from('payments')
+          .select('amount, paid_amount, paid_date')
+          .eq('status', 'paid')
+          .gte('paid_date', sixMonthsAgo.toISOString())
+          .lte('paid_date', now.toISOString())
+          .not('paid_date', 'is', null)
+          .range(from, from + pageSize - 1);
+        
+        if (paymentsPage && paymentsPage.length > 0) {
+          allPayments = allPayments.concat(paymentsPage);
+          from += pageSize;
+          hasMore = paymentsPage.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const payments = allPayments;
+
+      const monthlyData: { [key: string]: { month: string; year: number; revenue: number } } = {};
 
       payments?.forEach((payment: any) => {
         if (payment.paid_date) {
           const date = new Date(payment.paid_date);
-          // Formato: "Jan", "Feb", etc.
-          const monthShort = date.toLocaleDateString('pt-PT', { month: 'short' });
-          const month = monthShort.charAt(0).toUpperCase() + monthShort.slice(1, 3);
           
-          // CORRIGIDO: usar paid_amount se > 0, caso contrário amount
-          const paymentValue = (payment.paid_amount && payment.paid_amount > 0) 
-            ? Number(payment.paid_amount)
-            : Number(payment.amount);
-          
-          monthlyData[month] = (monthlyData[month] || 0) + paymentValue;
+          // NOVO: Só processar se for até a data atual
+          if (date <= now) {
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const monthShort = date.toLocaleDateString('pt-PT', { month: 'short' });
+            const month = monthShort.charAt(0).toUpperCase() + monthShort.slice(1, 3);
+            
+            // CORRIGIDO: usar paid_amount se > 0, caso contrário amount
+            const paymentValue = (payment.paid_amount && payment.paid_amount > 0) 
+              ? Number(payment.paid_amount)
+              : Number(payment.amount);
+            
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = { month, year: date.getFullYear(), revenue: 0 };
+            }
+            monthlyData[monthKey].revenue += paymentValue;
+          }
         }
       });
 
       // Ordenar por mês (últimos 6 meses)
-      const now = new Date();
       const result: Array<{ month: string; revenue: number }> = [];
       
       for (let i = 5; i >= 0; i--) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const monthShort = date.toLocaleDateString('pt-PT', { month: 'short' });
         const month = monthShort.charAt(0).toUpperCase() + monthShort.slice(1, 3);
+        
         result.push({
           month,
-          revenue: monthlyData[month] || 0,
+          revenue: monthlyData[monthKey]?.revenue || 0,
         });
       }
 
@@ -198,29 +228,33 @@ export class DashboardService {
       if (error || !statusCounts) {
         console.log('RPC não disponível, usando query manual');
         
-        // Query para todos os status diretos
-        const [paidResult, pendingResult, renegociadoResult, failedResult] = await Promise.all([
+        // Query para todos os status diretos (incluindo overdue que já está no banco)
+        const [paidResult, pendingResult, overdueResult, renegociadoResult, failedResult] = await Promise.all([
           supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'paid'),
           supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'overdue'), // CORRIGIDO: buscar overdue direto
           supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'renegociado'),
           supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
         ]);
 
-        // Calcular overdue (pending com due_date < hoje)
+        // Também contar pending com due_date vencida (caso existam pending que deveriam ser overdue)
         const today = new Date().toISOString().split('T')[0];
-        const overdueResult = await supabase
+        const pendingOverdueResult = await supabase
           .from('payments')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending')
           .lt('due_date', today);
 
-        // Calcular pending real (pending com due_date >= hoje)
-        const pendingNotOverdue = (pendingResult.count || 0) - (overdueResult.count || 0);
+        // Total de overdue = overdue direto + pending vencido
+        const totalOverdue = (overdueResult.count || 0) + (pendingOverdueResult.count || 0);
+        
+        // Pending real = pending total - pending vencido
+        const pendingNotOverdue = (pendingResult.count || 0) - (pendingOverdueResult.count || 0);
 
         return [
           { status: 'paid', count: paidResult.count || 0 },
           { status: 'pending', count: pendingNotOverdue },
-          { status: 'overdue', count: overdueResult.count || 0 },
+          { status: 'overdue', count: totalOverdue }, // CORRIGIDO: inclui ambos
           { status: 'renegociado', count: renegociadoResult.count || 0 },
           { status: 'failed', count: failedResult.count || 0 },
         ];
