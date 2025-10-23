@@ -144,6 +144,13 @@ class ApiService {
     });
   }
 
+  async updateClientRating(id: string, rating: number): Promise<ApiResponse<Client>> {
+    return this.request(`/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ rating }),
+    });
+  }
+
   // Contract methods
   async getContracts(filters?: Record<string, any>): Promise<ApiResponse<Contract[]>> {
     let endpoint = '/contracts';

@@ -267,13 +267,43 @@ useEffect(() => {
     setSortColumn(column);
     setSortDirection(direction);
     
-    const sortedContracts = [...contracts].sort((a, b) => {
+    const sortedContracts = [...filteredContracts].sort((a, b) => {
       let aValue = a[column as keyof Contract] as any;
       let bValue = b[column as keyof Contract] as any;
       
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      // Handle null/undefined values - put them at the end
+      if (aValue === null || aValue === undefined) {
+        return direction === 'asc' ? 1 : -1;
+      }
+      if (bValue === null || bValue === undefined) {
+        return direction === 'asc' ? -1 : 1;
+      }
       
+      // Handle string values (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      // Handle numeric comparison (value, number_of_payments, etc)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        if (direction === 'asc') {
+          return aValue - bValue;
+        } else {
+          return bValue - aValue;
+        }
+      }
+      
+      // Handle date comparison
+      if (column === 'start_date' || column === 'end_date') {
+        const dateA = new Date(aValue).getTime();
+        const dateB = new Date(bValue).getTime();
+        if (!isNaN(dateA) && !isNaN(dateB)) {
+          return direction === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+      }
+      
+      // Handle other types
       if (direction === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -281,7 +311,7 @@ useEffect(() => {
       }
     });
     
-    setContracts(sortedContracts);
+    setFilteredContracts(sortedContracts);
     setCurrentPage(1); // Reset to first page after sorting
   };
 
