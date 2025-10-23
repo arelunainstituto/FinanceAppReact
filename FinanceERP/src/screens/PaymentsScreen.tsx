@@ -15,7 +15,9 @@ import ApiService from '../services/api';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
-import DataTable, { DataTableColumn } from '../components/DataTable';
+import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
+import ActionButton from '../components/common/ActionButton';
+import StatusBadge from '../components/common/StatusBadge';
 import { formatCurrency } from '../utils/currency';
 import { formatDate } from '../utils/dateUtils';
 import { convertDateFiltersToApiFormat } from '../utils/dateFormatUtils';
@@ -528,32 +530,32 @@ const PaymentsScreen: React.FC = () => {
     return payment.status || 'pending';
   };
 
-  const renderStatusBadge = (payment: Payment) => {
-    // Calcular o status real do pagamento
-    const realStatus = getPaymentStatus(payment);
-    
-    return (
-      <View style={[
-        styles.statusBadge,
-        realStatus === 'paid' ? styles.paidBadge : 
-        realStatus === 'pending' ? styles.pendingBadge :
-        realStatus === 'overdue' ? styles.overdueBadge :
-        realStatus === 'renegociado' ? styles.renegociadoBadge : styles.failedBadge
-      ]}>
-        <Text style={[
-          styles.statusText,
-          { color: realStatus === 'paid' ? '#34C759' : 
-                   realStatus === 'pending' ? '#FF9500' :
-                   realStatus === 'overdue' ? '#FF3B30' :
-                   realStatus === 'renegociado' ? '#3B82F6' : '#8E8E93' }
-        ]}>
-          {realStatus === 'paid' ? 'Pago' : 
-           realStatus === 'pending' ? 'Pendente' :
-           realStatus === 'overdue' ? 'Atrasado' :
-           realStatus === 'renegociado' ? 'Renegociado' : 'Cancelado'}
-        </Text>
-      </View>
-    );
+  const getStatusVariant = (status: string): 'success' | 'warning' | 'danger' | 'info' | 'default' => {
+    switch (status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'overdue':
+        return 'danger';
+      case 'renegociado':
+        return 'info';
+      case 'failed':
+        return 'danger';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: string): string => {
+    switch (status) {
+      case 'paid': return 'PAGO';
+      case 'pending': return 'PENDENTE';
+      case 'overdue': return 'ATRASADO';
+      case 'renegociado': return 'RENEGOCIADO';
+      case 'failed': return 'CANCELADO';
+      default: return status.toUpperCase();
+    }
   };
 
   const getFilterLabel = (filter: PaymentFilter) => {
@@ -568,97 +570,140 @@ const PaymentsScreen: React.FC = () => {
     }
   };
 
-  const columns: DataTableColumn[] = [
+  const columns: UltimaTableColumn[] = [
     {
       key: 'contract',
       title: 'Contrato',
-      width: isTablet ? 90 : 70,
+      width: '7%',
+      align: 'left',
       sortable: false,
-      render: (payment: Payment) => payment.contract?.contract_number || 'N/A',
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">
+          {payment.contract?.contract_number || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'client',
       title: 'Cliente',
+      width: '11%',
+      align: 'left',
       sortable: false,
-      render: (payment: Payment) => 
-        payment.contract?.client ? 
-          payment.contract.client.first_name : 'N/A',
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {payment.contract?.client ? payment.contract.client.first_name : 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'amount',
       title: 'Valor',
-      width: isTablet ? 90 : 70,
+      width: '7%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => formatCurrency(payment.amount || 0),
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#334155', fontWeight: '600' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatCurrency(payment.amount || 0)}
+        </Text>
+      ),
     },
     {
       key: 'paid_amount',
       title: 'V. Pago',
-      width: isTablet ? 90 : 70,
+      width: '7%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => formatCurrency(payment.paid_amount || 0),
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatCurrency(payment.paid_amount || 0)}
+        </Text>
+      ),
     },
     {
       key: 'due_date',
       title: 'Vencimento',
-      width: isTablet ? 100 : 80,
+      width: '8%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => formatDate(payment.due_date),
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatDate(payment.due_date)}
+        </Text>
+      ),
     },
     {
       key: 'paid_date',
       title: 'Data Pagamento',
-      width: isTablet ? 110 : 90,
+      width: '9%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => payment.paid_date ? formatDate(payment.paid_date) : '-',
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {payment.paid_date ? formatDate(payment.paid_date) : '-'}
+        </Text>
+      ),
     },
     {
       key: 'created_at',
       title: 'Data Criação',
-      width: isTablet ? 110 : 90,
+      width: '9%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => formatDate(payment.created_at),
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatDate(payment.created_at)}
+        </Text>
+      ),
     },
     {
       key: 'payment_type',
       title: 'Tipo',
-      width: isTablet ? 90 : 70,
+      width: '7%',
+      align: 'left',
       sortable: false,
       render: (payment: Payment) => {
         const type = payment.payment_type || 'normalPayment';
         return (
-          <View style={[
-            styles.typeBadge,
-            type === 'downPayment' ? styles.downPaymentBadge : styles.normalPaymentBadge
-          ]}>
-            <Text style={[
-              styles.typeText,
-              type === 'downPayment' ? styles.downPaymentText : styles.normalPaymentText
-            ]}>
-              {type === 'downPayment' ? 'Entrada' : 'Parcela'}
-            </Text>
-          </View>
+          <StatusBadge
+            label={type === 'downPayment' ? 'ENTRADA' : 'PARCELA'}
+            variant={type === 'downPayment' ? 'info' : 'default'}
+          />
         );
       },
     },
     {
       key: 'installment',
       title: 'Nº Parcela',
-      width: isTablet ? 80 : 60,
+      width: '6%',
+      align: 'left',
       sortable: false,
-      render: (payment: Payment) => payment.notes || 'N/A',
+      render: (payment: Payment) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {payment.notes || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'status',
       title: 'Status',
-      width: isTablet ? 100 : 80,
+      width: '7%',
+      align: 'left',
       sortable: true,
-      render: (payment: Payment) => renderStatusBadge(payment),
+      render: (payment: Payment) => {
+        const realStatus = getPaymentStatus(payment);
+        return (
+          <StatusBadge
+            label={getStatusLabel(realStatus)}
+            variant={getStatusVariant(realStatus)}
+          />
+        );
+      },
     },
     {
       key: 'paid',
       title: 'Pago',
-      width: isTablet ? 60 : 50,
+      width: '5%',
+      align: 'left',
       sortable: false,
       render: (payment: Payment) => (
         <TouchableOpacity
@@ -681,45 +726,13 @@ const PaymentsScreen: React.FC = () => {
     {
       key: 'payment_method',
       title: 'Método',
-      width: isTablet ? 80 : 60,
-      sortable: false,
-      render: (payment: Payment) => payment.payment_method || 'N/A',
-    },
-    {
-      key: 'actions',
-      title: 'Ações',
-      width: isTablet ? 120 : 100,
+      width: '6%',
+      align: 'left',
       sortable: false,
       render: (payment: Payment) => (
-        <View style={styles.actionsContainer}>
-          {/* Botão de pagamento manual - só aparece se a parcela não estiver completamente paga */}
-          {payment.status !== 'paid' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.moneyButton]}
-              onPress={() => {
-                console.log('🔍 Clicou no ícone de dinheiro para pagamento:', payment.id);
-                console.log('🔍 Payment data:', payment);
-                setSelectedPaymentForManual(payment);
-                setShowManualPaymentModal(true);
-                console.log('🔍 Modal deve estar visível agora');
-              }}
-            >
-              <Ionicons name="cash" size={16} color="#F59E0B" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => handleEditPayment(payment)}
-          >
-            <Ionicons name="pencil" size={16} color="#007BFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeletePayment(payment)}
-          >
-            <Ionicons name="trash" size={16} color="#DC3545" />
-          </TouchableOpacity>
-        </View>
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {payment.payment_method || 'N/A'}
+        </Text>
       ),
     },
   ];
@@ -837,7 +850,7 @@ const PaymentsScreen: React.FC = () => {
             initialFilters={advancedFilters}
           />
 
-          <DataTable
+          <UltimaTable
             data={payments}
             columns={columns}
             loading={isLoading}
@@ -846,6 +859,33 @@ const PaymentsScreen: React.FC = () => {
             sortColumn={sortColumn}
             sortDirection={sortDirection}
             keyExtractor={(item) => item.id}
+            actions={(payment: Payment) => (
+              <>
+                {payment.status !== 'paid' && (
+                  <ActionButton
+                    icon="cash"
+                    variant="warning"
+                    onPress={() => {
+                      console.log('🔍 Clicou no ícone de dinheiro para pagamento:', payment.id);
+                      console.log('🔍 Payment data:', payment);
+                      setSelectedPaymentForManual(payment);
+                      setShowManualPaymentModal(true);
+                      console.log('🔍 Modal deve estar visível agora');
+                    }}
+                  />
+                )}
+                <ActionButton
+                  icon="pencil"
+                  variant="primary"
+                  onPress={() => handleEditPayment(payment)}
+                />
+                <ActionButton
+                  icon="trash"
+                  variant="danger"
+                  onPress={() => handleDeletePayment(payment)}
+                />
+              </>
+            )}
           />
 
           {renderPaginationControls()}
@@ -1031,60 +1071,6 @@ const styles = StyleSheet.create({
   activeFilterButtonText: {
     color: '#FFFFFF',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  paidBadge: {
-    backgroundColor: '#DCFCE7',
-  },
-  pendingBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  overdueBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  failedBadge: {
-    backgroundColor: '#F1F5F9',
-  },
-  renegociadoBadge: {
-    backgroundColor: '#DBEAFE',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  editButton: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#DBEAFE',
-  },
-  deleteButton: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  moneyButton: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
   paginationContainer: {
     marginTop: 20,
     paddingTop: 16,
@@ -1159,30 +1145,6 @@ const styles = StyleSheet.create({
   checkboxDisabled: {
     backgroundColor: '#F3F4F6',
     borderColor: '#E5E7EB',
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  downPaymentBadge: {
-    backgroundColor: '#E0F2FE',
-  },
-  normalPaymentBadge: {
-    backgroundColor: '#F0F9FF',
-  },
-  typeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  downPaymentText: {
-    color: '#0369A1',
-  },
-  normalPaymentText: {
-    color: '#0284C7',
   },
   headerButtons: {
     flexDirection: 'row',

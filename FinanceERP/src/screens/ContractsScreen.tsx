@@ -16,7 +16,9 @@ import ApiService from '../services/api';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
-import DataTable, { DataTableColumn } from '../components/DataTable';
+import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
+import ActionButton from '../components/common/ActionButton';
+import StatusBadge from '../components/common/StatusBadge';
 import ContractAdvancedFilters, { ContractAdvancedFiltersData } from '../components/filters/ContractAdvancedFilters';
 import ContractFilterChips from '../components/filters/ContractFilterChips';
 import { formatCurrency } from '../utils/currency';
@@ -402,157 +404,165 @@ useEffect(() => {
     );
   };
 
-  const columns: DataTableColumn[] = [
+  const getStatusVariant = (status: string): 'success' | 'info' | 'warning' | 'danger' | 'default' => {
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'ativo':
+        return 'success';
+      case 'liquidado':
+        return 'info';
+      case 'renegociado':
+        return 'warning';
+      case 'cancelado':
+      case 'jurídico':
+        return 'danger';
+      default:
+        return 'default';
+    }
+  };
+
+  const columns: UltimaTableColumn[] = [
     {
       key: 'contract_number',
       title: 'Número',
       sortable: true,
-      width: isTablet ? 100 : 70,
+      width: '7%',
+      align: 'left',
+      render: (contract: Contract) => (
+        <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">
+          {contract.contract_number || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'local',
       title: 'Local',
       sortable: true,
-      width: isTablet ? 120 : 90,
-      render: (contract: Contract) => contract.local || 'N/A',
+      width: '9%',
+      align: 'left',
+      render: (contract: Contract) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {contract.local || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'area',
       title: 'Área',
       sortable: true,
-      width: isTablet ? 100 : 80,
-      render: (contract: Contract) => contract.area || 'N/A',
+      width: '7%',
+      align: 'left',
+      render: (contract: Contract) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {contract.area || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'gestora',
       title: 'Gestor(a)',
       sortable: true,
-      width: isTablet ? 120 : 90,
-      render: (contract: Contract) => contract.gestora || 'N/A',
+      width: '9%',
+      align: 'left',
+      render: (contract: Contract) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {contract.gestora || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'medico',
       title: 'Médico(a)',
       sortable: true,
-      width: isTablet ? 120 : 90,
-      render: (contract: Contract) => contract.medico || 'N/A',
+      width: '9%',
+      align: 'left',
+      render: (contract: Contract) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {contract.medico || 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'client_name',
       title: 'Cliente',
       sortable: true,
+      width: '12%',
+      align: 'left',
       render: (contract: Contract) => {
         if (contract.client) {
           const firstName = contract.client.first_name || '';
           const lastName = contract.client.last_name || '';
-          return `${firstName} ${lastName}`.trim() || 'N/A';
+          const fullName = `${firstName} ${lastName}`.trim() || 'N/A';
+          return (
+            <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500' }} numberOfLines={1} ellipsizeMode="tail">
+              {fullName}
+            </Text>
+          );
         }
-        return 'N/A';
+        return (
+          <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">N/A</Text>
+        );
       },
     },
     {
       key: 'value',
       title: 'Valor',
       sortable: true,
-      width: isTablet ? 100 : 70,
-      render: (contract: Contract, value: number) => formatCurrency(value as number),
+      width: '7%',
+      align: 'left',
+      render: (contract: Contract, value: number) => (
+        <Text style={{ fontSize: 14, color: '#334155', fontWeight: '600' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatCurrency(value as number)}
+        </Text>
+      ),
     },
     {
       key: 'number_of_payments',
       title: 'Nº Parcelas',
       sortable: true,
-      width: isTablet ? 80 : 60,
-      render: (contract: Contract, numberOfPayments: number) => numberOfPayments ? numberOfPayments.toString() : 'N/A',
+      width: '6%',
+      align: 'left',
+      render: (contract: Contract, numberOfPayments: number) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {numberOfPayments ? numberOfPayments.toString() : 'N/A'}
+        </Text>
+      ),
     },
     {
       key: 'status',
       title: 'Status',
       sortable: true,
-      width: isTablet ? 90 : 70,
-      render: (contract: Contract, status: string) => {
-        const getStatusStyle = (status: string) => {
-          switch (status) {
-            case 'Ativo':
-            case 'ativo':
-              return { badge: styles.activeBadge, color: '#16A34A' };
-            case 'Liquidado':
-            case 'liquidado':
-              return { badge: styles.completedBadge, color: '#2563EB' };
-            case 'Renegociado':
-            case 'renegociado':
-              return { badge: styles.renegotiatedBadge, color: '#F59E0B' };
-            case 'Cancelado':
-            case 'cancelado':
-              return { badge: styles.cancelledBadge, color: '#DC2626' };
-            case 'Jurídico':
-            case 'jurídico':
-              return { badge: styles.legalBadge, color: '#7C3AED' };
-            default:
-              return { badge: styles.inactiveBadge, color: '#6B7280' };
-          }
-        };
-
-        const statusStyle = getStatusStyle(status);
-        
-        return (
-          <View style={[styles.statusBadge, statusStyle.badge]}>
-            <Text style={[styles.statusText, { color: statusStyle.color }]}>
-              {status}
-            </Text>
-          </View>
-        );
-      },
+      width: '8%',
+      align: 'left',
+      render: (contract: Contract, status: string) => (
+        <StatusBadge
+          label={status.toUpperCase()}
+          variant={getStatusVariant(status)}
+        />
+      ),
     },
     {
       key: 'start_date',
       title: 'Início',
       sortable: true,
-      width: isTablet ? 80 : 60,
-      render: (contract: Contract, date: string) => formatDate(date as string),
+      width: '7%',
+      align: 'left',
+      render: (contract: Contract, date: string) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatDate(date as string)}
+        </Text>
+      ),
     },
     {
       key: 'end_date',
       title: 'Fim',
       sortable: true,
-      width: isTablet ? 80 : 60,
-      render: (contract: Contract, date: string) => formatDate(date as string),
-    },
-
-    {
-      key: 'actions',
-      title: 'Ações',
-      sortable: false,
-      width: isTablet ? 140 : 120,
-      render: (contract: Contract) => (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.viewDetailsButton]}
-            onPress={() => {
-              setSelectedContractId(contract.id);
-              setShowDetailsModal(true);
-            }}
-          >
-            <Ionicons name="eye" size={16} color="#6366F1" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.viewPaymentsButton]}
-            onPress={() => navigation.navigate('Payments', { contractId: contract.id })}
-          >
-            <Ionicons name="card" size={16} color="#10B981" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => handleEditContract(contract)}
-          >
-            <Ionicons name="pencil" size={16} color="#007BFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteContract(contract)}
-          >
-            <Ionicons name="trash" size={16} color="#DC3545" />
-          </TouchableOpacity>
-        </View>
+      width: '7%',
+      align: 'left',
+      render: (contract: Contract, date: string) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
+          {formatDate(date as string)}
+        </Text>
       ),
     },
   ];
@@ -624,7 +634,7 @@ useEffect(() => {
             onClearAll={() => setAdvancedFilters({})}
           />
 
-          <DataTable
+          <UltimaTable
             data={getCurrentPageData()}
             columns={columns}
             loading={isLoading}
@@ -632,6 +642,33 @@ useEffect(() => {
             onRowPress={handleRowPress}
             sortColumn={sortColumn}
             sortDirection={sortDirection}
+            actions={(contract: Contract) => (
+              <>
+                <ActionButton
+                  icon="eye"
+                  variant="info"
+                  onPress={() => {
+                    setSelectedContractId(contract.id);
+                    setShowDetailsModal(true);
+                  }}
+                />
+                <ActionButton
+                  icon="card"
+                  variant="success"
+                  onPress={() => navigation.navigate('Payments', { contractId: contract.id })}
+                />
+                <ActionButton
+                  icon="pencil"
+                  variant="primary"
+                  onPress={() => handleEditContract(contract)}
+                />
+                <ActionButton
+                  icon="trash"
+                  variant="danger"
+                  onPress={() => handleDeleteContract(contract)}
+                />
+              </>
+            )}
           />
 
           {renderPaginationControls()}
@@ -723,43 +760,6 @@ const styles = StyleSheet.create({
   filtersContainer: {
     marginBottom: 20,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clientFilter: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  activeBadge: {
-    backgroundColor: '#DCFCE7',
-  },
-  completedBadge: {
-    backgroundColor: '#DBEAFE',
-  },
-  inactiveBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  renegotiatedBadge: {
-    backgroundColor: '#FEF3C7',
-  },
-  cancelledBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  legalBadge: {
-    backgroundColor: '#EDE9FE',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   paginationContainer: {
     marginTop: 20,
     paddingTop: 16,
@@ -813,37 +813,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
     paddingHorizontal: 4,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  editButton: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#DBEAFE',
-  },
-  deleteButton: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  viewPaymentsButton: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  viewDetailsButton: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
   },
   filterButton: {
     flexDirection: 'row',

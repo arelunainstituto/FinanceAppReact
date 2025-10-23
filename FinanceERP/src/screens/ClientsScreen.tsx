@@ -16,7 +16,10 @@ import ApiService from '../services/api';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import MainLayout from '../components/layout/MainLayout';
-import DataTable, { DataTableColumn } from '../components/DataTable';
+import UltimaTable, { UltimaTableColumn } from '../components/UltimaTable';
+import StatusBadge from '../components/common/StatusBadge';
+import Avatar from '../components/common/Avatar';
+import ActionButton from '../components/common/ActionButton';
 import ClientForm from '../components/forms/ClientForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ClientAdvancedFilters from '../components/filters/ClientAdvancedFilters';
@@ -433,65 +436,60 @@ const ClientsScreen: React.FC = () => {
     );
   };
 
-  const renderStatusBadge = (status: string) => (
-    <View style={[
-      styles.statusBadge,
-      status === 'ativo' ? styles.activeBadge : styles.inactiveBadge
-    ]}>
-      <Text style={[
-        styles.statusText,
-        { color: status === 'ativo' ? '#16A34A' : '#DC2626' }
-      ]}>
-        {status}
-      </Text>
-    </View>
-  );
-
-  const columns: DataTableColumn[] = [
+  const columns: UltimaTableColumn[] = [
     {
       key: 'first_name',
       title: 'Nome',
       sortable: true,
-      render: (client: Client) => (
-        <Text style={{ fontSize: 14, color: '#374151', fontWeight: '500' }}>
-          {client.first_name || 'N/A'}
-        </Text>
-      ),
+      align: 'left',
+      width: '28%',
+      render: (client: Client) => {
+        const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim() || 'N/A';
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Avatar name={fullName} size={36} />
+            <Text style={{ fontSize: 14, color: '#334155', fontWeight: '500', flex: 1 }}>
+              {fullName}
+            </Text>
+          </View>
+        );
+      },
     },
     {
       key: 'email',
       title: 'Email',
       sortable: true,
+      align: 'left',
+      width: '30%',
+      render: (client: Client) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }}>
+          {client.email || '-'}
+        </Text>
+      ),
     },
-
+    {
+      key: 'tax_id',
+      title: 'NIF',
+      sortable: true,
+      align: 'left',
+      width: '18%',
+      render: (client: Client) => (
+        <Text style={{ fontSize: 14, color: '#64748B' }}>
+          {client.tax_id || '-'}
+        </Text>
+      ),
+    },
     {
       key: 'status',
       title: 'Status',
       sortable: true,
-      width: isTablet ? 80 : 60,
-      render: (client: Client, status: string) => renderStatusBadge(status),
-    },
-
-    {
-      key: 'actions',
-      title: 'Ações',
-      sortable: false,
-      width: isTablet ? 100 : 80,
+      align: 'left',
+      width: '16%',
       render: (client: Client) => (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => handleEditClient(client)}
-          >
-            <Ionicons name="pencil" size={16} color="#007BFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteClient(client)}
-          >
-            <Ionicons name="trash" size={16} color="#DC3545" />
-          </TouchableOpacity>
-        </View>
+        <StatusBadge 
+          label={client.status.toUpperCase()} 
+          variant={client.status === 'ativo' ? 'success' : 'default'}
+        />
       ),
     },
   ];
@@ -521,13 +519,7 @@ const ClientsScreen: React.FC = () => {
             </View>
           </View>
 
-          <View style={styles.searchContainer}>
-            <Input
-              placeholder="Procurar por nome do cliente..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              containerStyle={styles.searchInput}
-            />
+          <View style={styles.filtersRow}>
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowAdvancedFilters(true)}
@@ -540,7 +532,7 @@ const ClientsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          <DataTable
+          <UltimaTable
             data={getCurrentPageData()}
             columns={columns}
             loading={isLoading}
@@ -549,6 +541,26 @@ const ClientsScreen: React.FC = () => {
             sortColumn={sortColumn}
             sortDirection={sortDirection}
             keyExtractor={(item) => item.id}
+            showGlobalSearch={true}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Pesquisar clientes..."
+            actions={(client: Client) => (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ActionButton
+                  icon="pencil"
+                  onPress={() => handleEditClient(client)}
+                  variant="secondary"
+                  size={18}
+                />
+                <ActionButton
+                  icon="trash"
+                  onPress={() => handleDeleteClient(client)}
+                  variant="danger"
+                  size={18}
+                />
+              </View>
+            )}
           />
 
           <PaginationControls
@@ -620,11 +632,10 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     letterSpacing: -0.5,
   },
-  searchContainer: {
+  filtersRow: {
+    flexDirection: 'row',
     marginBottom: 20,
-  },
-  searchInput: {
-    marginBottom: 0,
+    gap: 12,
   },
   statusBadge: {
     paddingHorizontal: 12,
