@@ -13,19 +13,42 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import Button from './common/Button';
 import { formatCurrency } from '../utils/currency';
+import api from '../services/api';
+
+interface PreviewMatch {
+  excelRow: number;
+  clientName: string;
+  amount: number;
+  description: string;
+  status: string;
+  matchedPayment: {
+    paymentId: string;
+    contractNumber: string;
+    dueDate: string;
+    amount: number;
+    clientName: string;
+  } | null;
+  error?: string;
+}
+
+interface PreviewResult {
+  matches: PreviewMatch[];
+  errors: {
+    row: number;
+    error: string;
+  }[];
+}
 
 interface ImportResult {
   success: {
+    paymentId: string;
     clientName: string;
     amount: number;
     contractNumber: string;
     dueDate: string;
-    paymentId: string;
   }[];
   errors: {
-    row: number;
-    clientName?: string;
-    amount?: number;
+    paymentId: string;
     error: string;
   }[];
 }
@@ -42,9 +65,11 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
   onSuccess,
 }) => {
   const [selectedFile, setSelectedFile] = useState<any>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [selectedPayments, setSelectedPayments] = useState<Set<string>>(new Set());
+  const [confirmedPayments, setConfirmedPayments] = useState<Set<string>>(new Set());
 
   const handlePickDocument = useCallback(async () => {
     try {
@@ -58,14 +83,12 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        console.log('📄 File selected:', {
-          name: file.name,
-          size: file.size,
-          mimeType: file.mimeType,
-          uri: file.uri
-        });
+        console.log('File selected:', file.name);
         setSelectedFile(file);
+        setPreviewResult(null);
         setImportResult(null);
+        setSelectedPayments(new Set());
+        setConfirmedPayments(new Set());
       }
     } catch (err) {
       console.error('Error picking document:', err);
@@ -73,38 +96,24 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
     }
   }, []);
 
-  const handleUpload = useCallback(async () => {
+  const handlePreview = useCallback(async () => {
     if (!selectedFile) {
       Alert.alert('Erro', 'Nenhum arquivo selecionado');
       return;
     }
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    setIsLoading(true);
 
     try {
-      const formData = new FormData();
-      
-      // Create file object for FormData
-      // For web, we need to fetch the blob from the URI
       let fileToUpload: any;
       
       if (typeof window !== 'undefined' && selectedFile.uri.startsWith('blob:')) {
-        // Web environment - fetch the blob
-        console.log('🌐 Web environment detected, fetching blob from URI');
         const response = await fetch(selectedFile.uri);
         const blob = await response.blob();
         fileToUpload = new File([blob], selectedFile.name, {
           type: selectedFile.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         });
-        console.log('📦 File object created:', {
-          name: fileToUpload.name,
-          size: fileToUpload.size,
-          type: fileToUpload.type
-        });
       } else {
-        // Mobile environment - use URI directly
-        console.log('📱 Mobile environment detected, using URI');
         fileToUpload = {
           uri: selectedFile.uri,
           type: selectedFile.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -112,123 +121,128 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
         };
       }
 
-      formData.append('file', fileToUpload as any);
-
-      // Simulate progress - goes up to 90%, then waits for actual response
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            return 90; // Stop at 90%, don't clear interval here
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // Get token from AsyncStorage
-      const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
-      const token = await AsyncStorage.getItem('auth_token');
-
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado');
+      const response = await api.previewImportFromExcel(fileToUpload);
+      
+      if (response.success && response.data) {
+        setPreviewResult(response.data);
+        const validMatches = response.data.matches
+          .filter(m => m.matchedPayment && !m.error)
+          .map(m => m.matchedPayment!.paymentId);
+        setSelectedPayments(new Set(validMatches));
+      } else {
+        Alert.alert('Erro', 'Não foi possível processar o arquivo');
       }
-      
-      console.log('🔑 Token obtido para importação:', token ? 'Token presente' : 'Token ausente');
-
-      // Get API URL - match the logic from api.ts
-      const getApiUrl = () => {
-        // PRIORITY 1: Use environment variable if available
-        if (process.env.REACT_APP_API_BASE_URL) {
-          const url = process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '').replace(/\/api$/, '');
-          console.log('🌐 Using API URL from environment:', url);
-          return url;
-        }
-        
-        // PRIORITY 2: Detect based on current domain
-        if (typeof window !== 'undefined') {
-          const currentUrl = window.location.origin;
-          
-          // Development: localhost
-          if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-            console.log('🌐 Using localhost API URL');
-            return 'http://localhost:3000';
-          }
-          
-          // Production or Vercel deployments: use same domain
-          console.log('🌐 Using current domain API URL:', currentUrl);
-          return currentUrl;
-        }
-        
-        // PRIORITY 3: Fallback
-        console.log('🌐 Using fallback API URL');
-        return 'https://financeiro.institutoareluna.pt';
-      };
-
-      const API_URL = getApiUrl();
-      console.log('📤 Sending import request to:', `${API_URL}/api/payments/import`);
-
-      const response = await fetch(`${API_URL}/api/payments/import`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      console.log('📥 Response received, clearing progress interval...');
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      console.log('✓ Progress set to 100%');
-
-      // Check for timeout or errors before parsing
-      if (!response.ok) {
-        let errorMessage = 'Erro ao processar arquivo';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          // If can't parse JSON, use status text
-          if (response.status === 504 || response.status === 524) {
-            errorMessage = 'Timeout: O arquivo é muito grande ou tem muitos registros. Tente com uma planilha menor.';
-          } else {
-            errorMessage = `Erro ${response.status}: ${response.statusText}`;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      console.log('📊 Response data parsed:', data);
-
-      console.log('✅ Import result:', data);
-      
-      // Small delay to show 100% progress before showing results
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setImportResult(data.data);
-      console.log('📋 Results displayed in modal');
-      
-      // Don't call onSuccess() here - let the user review results first
-      // onSuccess() will be called when they close the modal (handleClose)
     } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Erro', error instanceof Error ? error.message : 'Erro ao importar arquivo');
-      setUploadProgress(0);
+      console.error('Preview error:', error);
+      Alert.alert('Erro', error instanceof Error ? error.message : 'Erro ao processar arquivo');
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
     }
   }, [selectedFile]);
 
-  const handleClose = useCallback(() => {
-    // If there was a successful import, call onSuccess to refresh the payments list
-    if (importResult && importResult.success.length > 0) {
-      onSuccess();
-    }
+  const handleTogglePayment = useCallback((paymentId: string) => {
+    setSelectedPayments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(paymentId)) {
+        newSet.delete(paymentId);
+      } else {
+        newSet.add(paymentId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleToggleAll = useCallback(() => {
+    if (!previewResult) return;
     
+    const validPaymentIds = previewResult.matches
+      .filter(m => m.matchedPayment && !m.error && !confirmedPayments.has(m.matchedPayment.paymentId))
+      .map(m => m.matchedPayment!.paymentId);
+    
+    if (selectedPayments.size === validPaymentIds.length) {
+      // Deselect all
+      setSelectedPayments(new Set());
+    } else {
+      // Select all
+      setSelectedPayments(new Set(validPaymentIds));
+    }
+  }, [previewResult, selectedPayments, confirmedPayments]);
+
+  const handleConfirmImport = useCallback(async () => {
+    if (selectedPayments.size === 0) {
+      Alert.alert('Aviso', 'Nenhum pagamento selecionado para importação');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const paymentIds = Array.from(selectedPayments);
+      const response = await api.confirmImport(paymentIds);
+      
+      if (response.success && response.data) {
+        setImportResult(response.data);
+        response.data.success.forEach(item => {
+          setConfirmedPayments(prev => new Set(prev).add(item.paymentId));
+        });
+        
+        Alert.alert(
+          'Importação Concluída',
+          `${response.data.success.length} pagamento(s) importado(s) com sucesso!`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                onSuccess();
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Confirm import error:', error);
+      Alert.alert('Erro', error instanceof Error ? error.message : 'Erro ao confirmar importação');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedPayments, onSuccess]);
+
+  const handleClose = useCallback(() => {
     setSelectedFile(null);
+    setPreviewResult(null);
     setImportResult(null);
-    setUploadProgress(0);
+    setSelectedPayments(new Set());
+    setConfirmedPayments(new Set());
     onClose();
-  }, [onClose, onSuccess, importResult]);
+  }, [onClose]);
+
+  const getStats = () => {
+    if (!previewResult) return { total: 0, eligible: 0, errors: 0 };
+    
+    const eligible = previewResult.matches.filter(m => m.matchedPayment && !m.error).length;
+    const errors = previewResult.matches.filter(m => m.error || !m.matchedPayment).length + previewResult.errors.length;
+    
+    return {
+      total: previewResult.matches.length,
+      eligible,
+      errors
+    };
+  };
+
+  const getRowStyle = (match: PreviewMatch) => {
+    if (match.error || !match.matchedPayment) {
+      return styles.rowError;
+    }
+    if (confirmedPayments.has(match.matchedPayment.paymentId)) {
+      return styles.rowConfirmed;
+    }
+    if (selectedPayments.has(match.matchedPayment.paymentId)) {
+      return styles.rowSelected;
+    }
+    return styles.rowDefault;
+  };
+
+  const stats = getStats();
 
   return (
     <Modal
@@ -248,7 +262,7 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
 
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             {/* File Selection Area */}
-            {!importResult && (
+            {!previewResult && !importResult && (
               <>
                 <View style={styles.infoBox}>
                   <Ionicons name="information-circle" size={20} color="#3B82F6" />
@@ -260,7 +274,7 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
                 <TouchableOpacity
                   style={styles.uploadArea}
                   onPress={handlePickDocument}
-                  disabled={isUploading}
+                  disabled={isLoading}
                 >
                   <Ionicons
                     name={selectedFile ? 'document' : 'cloud-upload'}
@@ -279,71 +293,206 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
                   )}
                 </TouchableOpacity>
 
-                {/* Progress Bar */}
-                {isUploading && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${uploadProgress}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>{uploadProgress}%</Text>
-                  </View>
-                )}
-
-                {/* Upload Button */}
                 <View style={styles.buttonContainer}>
                   <Button
-                    title={isUploading ? 'Importando...' : 'Importar'}
-                    onPress={handleUpload}
-                    disabled={!selectedFile || isUploading}
+                    title={isLoading ? 'Processando...' : 'Analisar Arquivo'}
+                    onPress={handlePreview}
+                    disabled={!selectedFile || isLoading}
                     variant="primary"
                   />
                 </View>
               </>
             )}
 
-            {/* Import Results */}
-            {importResult && (
+            {/* Loading */}
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text style={styles.loadingText}>Processando...</Text>
+              </View>
+            )}
+
+            {/* Preview Table */}
+            {previewResult && !importResult && !isLoading && (
               <>
-                {/* Success List */}
-                {importResult.success.length > 0 && (
-                  <View style={styles.resultSection}>
-                    <View style={styles.sectionHeader}>
-                      <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                      <Text style={styles.sectionTitle}>
-                        Pagamentos Importados ({importResult.success.length})
-                      </Text>
-                    </View>
-                    {importResult.success.map((item, index) => (
-                      <View key={index} style={styles.successItem}>
-                        <View style={styles.itemRow}>
-                          <Text style={styles.itemLabel}>Cliente:</Text>
-                          <Text style={styles.itemValue}>{item.clientName}</Text>
-                        </View>
-                        <View style={styles.itemRow}>
-                          <Text style={styles.itemLabel}>Valor:</Text>
-                          <Text style={[styles.itemValue, styles.amountText]}>
-                            {formatCurrency(item.amount)}
+                {/* Statistics Summary */}
+                <View style={styles.statsContainer}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{stats.total}</Text>
+                    <Text style={styles.statLabel}>Total Encontrado</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statValue, styles.statValueSuccess]}>{stats.eligible}</Text>
+                    <Text style={styles.statLabel}>Elegíveis</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statValue, styles.statValueError]}>{stats.errors}</Text>
+                    <Text style={styles.statLabel}>Com Erro</Text>
+                  </View>
+                </View>
+
+                {/* Selection Control */}
+                <View style={styles.selectionControl}>
+                  <TouchableOpacity 
+                    style={styles.selectAllButton}
+                    onPress={handleToggleAll}
+                  >
+                    <Ionicons 
+                      name={selectedPayments.size === stats.eligible ? 'checkbox' : 'square-outline'} 
+                      size={20} 
+                      color="#3B82F6" 
+                    />
+                    <Text style={styles.selectAllText}>
+                      Selecionar todos ({selectedPayments.size}/{stats.eligible})
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <View style={styles.tableHeaderCell1}>
+                    <Text style={styles.tableHeaderText}>Linha</Text>
+                  </View>
+                  <View style={styles.tableHeaderCell2}>
+                    <Text style={styles.tableHeaderText}>Dados do Excel</Text>
+                  </View>
+                  <View style={styles.tableHeaderCell3}>
+                    <Text style={styles.tableHeaderText}>Pagamento no Banco</Text>
+                  </View>
+                  <View style={styles.tableHeaderCell4}>
+                    <Text style={styles.tableHeaderText}>Status</Text>
+                  </View>
+                </View>
+
+                {/* Table Rows */}
+                <View style={styles.tableBody}>
+                  {previewResult.matches.map((match, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.tableRow, getRowStyle(match)]}
+                      onPress={() => match.matchedPayment && !match.error && !confirmedPayments.has(match.matchedPayment.paymentId) && handleTogglePayment(match.matchedPayment.paymentId)}
+                      disabled={!match.matchedPayment || !!match.error || (match.matchedPayment && confirmedPayments.has(match.matchedPayment.paymentId))}
+                    >
+                      {/* Column 1: Row Number */}
+                      <View style={styles.tableCell1}>
+                        <Text style={styles.rowNumber}>{match.excelRow}</Text>
+                      </View>
+
+                      {/* Column 2: Excel Data */}
+                      <View style={styles.tableCell2}>
+                        <Text style={styles.cellTitle}>{match.clientName}</Text>
+                        <Text style={styles.cellAmount}>{formatCurrency(match.amount)}</Text>
+                      </View>
+
+                      {/* Column 3: Bank Payment */}
+                      <View style={styles.tableCell3}>
+                        {match.matchedPayment ? (
+                          <>
+                            <Text style={styles.cellTitle}>{match.matchedPayment.clientName}</Text>
+                            <Text style={styles.cellSubtitle}>
+                              Contrato: {match.matchedPayment.contractNumber}
+                            </Text>
+                            <View style={styles.cellRow}>
+                              <Text style={styles.cellAmount}>{formatCurrency(match.matchedPayment.amount)}</Text>
+                              <Text style={styles.cellDate}>{match.matchedPayment.dueDate}</Text>
+                            </View>
+                          </>
+                        ) : (
+                          <Text style={styles.cellError}>
+                            {match.error || 'Sem correspondência'}
                           </Text>
-                        </View>
-                        <View style={styles.itemRow}>
-                          <Text style={styles.itemLabel}>Contrato:</Text>
-                          <Text style={styles.itemValue}>{item.contractNumber}</Text>
-                        </View>
-                        <View style={styles.itemRow}>
-                          <Text style={styles.itemLabel}>Vencimento:</Text>
-                          <Text style={styles.itemValue}>{item.dueDate}</Text>
-                        </View>
+                        )}
+                      </View>
+
+                      {/* Column 4: Status/Checkbox */}
+                      <View style={styles.tableCell4}>
+                        {match.error || !match.matchedPayment ? (
+                          <View style={styles.statusError}>
+                            <Ionicons name="close-circle" size={20} color="#DC2626" />
+                          </View>
+                        ) : confirmedPayments.has(match.matchedPayment.paymentId) ? (
+                          <View style={styles.statusConfirmed}>
+                            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                          </View>
+                        ) : (
+                          <Ionicons
+                            name={selectedPayments.has(match.matchedPayment.paymentId) ? 'checkbox' : 'square-outline'}
+                            size={24}
+                            color={selectedPayments.has(match.matchedPayment.paymentId) ? '#3B82F6' : '#94A3B8'}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* General Errors */}
+                {previewResult.errors.length > 0 && (
+                  <View style={styles.generalErrors}>
+                    <Text style={styles.generalErrorsTitle}>
+                      Erros de Processamento ({previewResult.errors.length})
+                    </Text>
+                    {previewResult.errors.map((err, index) => (
+                      <View key={index} style={styles.errorItem}>
+                        <Text style={styles.errorText}>
+                          Linha {err.row}: {err.error}
+                        </Text>
                       </View>
                     ))}
                   </View>
                 )}
 
-                {/* Error List */}
+                {/* Action Buttons */}
+                <View style={styles.actionButtons}>
+                  <View style={styles.buttonHalf}>
+                    <Button
+                      title="Cancelar"
+                      onPress={handleClose}
+                      variant="secondary"
+                    />
+                  </View>
+                  <View style={styles.buttonHalf}>
+                    <Button
+                      title={`Importar ${selectedPayments.size > 0 ? `(${selectedPayments.size})` : ''}`}
+                      onPress={handleConfirmImport}
+                      disabled={selectedPayments.size === 0 || isLoading}
+                      variant="primary"
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Import Results */}
+            {importResult && !isLoading && (
+              <>
+                <View style={styles.resultSection}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                    <Text style={styles.sectionTitle}>
+                      Importação Concluída ({importResult.success.length})
+                    </Text>
+                  </View>
+                  {importResult.success.map((item, index) => (
+                    <View key={index} style={styles.successItem}>
+                      <View style={styles.itemRow}>
+                        <Text style={styles.itemLabel}>Cliente:</Text>
+                        <Text style={styles.itemValue}>{item.clientName}</Text>
+                      </View>
+                      <View style={styles.itemRow}>
+                        <Text style={styles.itemLabel}>Valor:</Text>
+                        <Text style={[styles.itemValue, styles.amountText]}>
+                          {formatCurrency(item.amount)}
+                        </Text>
+                      </View>
+                      <View style={styles.itemRow}>
+                        <Text style={styles.itemLabel}>Contrato:</Text>
+                        <Text style={styles.itemValue}>{item.contractNumber}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
                 {importResult.errors.length > 0 && (
                   <View style={styles.resultSection}>
                     <View style={styles.sectionHeader}>
@@ -354,22 +503,14 @@ const ImportPaymentsModal: React.FC<ImportPaymentsModalProps> = ({
                     </View>
                     {importResult.errors.map((item, index) => (
                       <View key={index} style={styles.errorItem}>
-                        <Text style={styles.errorRow}>Linha {item.row}</Text>
-                        {item.clientName && (
-                          <Text style={styles.errorDetail}>Cliente: {item.clientName}</Text>
-                        )}
-                        {item.amount !== undefined && (
-                          <Text style={styles.errorDetail}>
-                            Valor: {formatCurrency(item.amount)}
-                          </Text>
-                        )}
-                        <Text style={styles.errorMessage}>{item.error}</Text>
+                        <Text style={styles.errorText}>
+                          ID: {item.paymentId} - {item.error}
+                        </Text>
                       </View>
                     ))}
                   </View>
                 )}
 
-                {/* Close Button */}
                 <View style={styles.buttonContainer}>
                   <Button
                     title="Fechar"
@@ -398,7 +539,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 900,
     maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -465,30 +606,222 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94A3B8',
   },
-  progressContainer: {
-    marginHorizontal: 24,
-    marginTop: 20,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: 4,
-  },
-  progressText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-  },
   buttonContainer: {
     padding: 24,
   },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748B',
+  },
+  // Statistics Cards
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  statValueSuccess: {
+    color: '#10B981',
+  },
+  statValueError: {
+    color: '#DC2626',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  // Selection Control
+  selectionControl: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  selectAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  // Table
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: '#CBD5E1',
+  },
+  tableHeaderCell1: {
+    width: 60,
+    justifyContent: 'center',
+  },
+  tableHeaderCell2: {
+    flex: 2,
+    justifyContent: 'center',
+  },
+  tableHeaderCell3: {
+    flex: 3,
+    justifyContent: 'center',
+  },
+  tableHeaderCell4: {
+    width: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tableHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tableBody: {
+    paddingHorizontal: 24,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    minHeight: 60,
+  },
+  rowDefault: {
+    backgroundColor: '#FFFFFF',
+  },
+  rowSelected: {
+    backgroundColor: '#EFF6FF',
+  },
+  rowConfirmed: {
+    backgroundColor: '#F0FDF4',
+  },
+  rowError: {
+    backgroundColor: '#FEF2F2',
+  },
+  tableCell1: {
+    width: 60,
+    justifyContent: 'center',
+  },
+  tableCell2: {
+    flex: 2,
+    justifyContent: 'center',
+    paddingRight: 12,
+  },
+  tableCell3: {
+    flex: 3,
+    justifyContent: 'center',
+    paddingRight: 12,
+  },
+  tableCell4: {
+    width: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  cellTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  cellSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  cellAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  cellDate: {
+    fontSize: 12,
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  cellRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cellError: {
+    fontSize: 13,
+    color: '#DC2626',
+    fontStyle: 'italic',
+  },
+  statusError: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusConfirmed: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // General Errors
+  generalErrors: {
+    marginHorizontal: 24,
+    marginVertical: 16,
+    padding: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+  },
+  generalErrorsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 12,
+  },
+  errorItem: {
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#7F1D1D',
+  },
+  // Action Buttons
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  buttonHalf: {
+    flex: 1,
+  },
+  // Results
   resultSection: {
     marginHorizontal: 24,
     marginTop: 16,
@@ -533,31 +866,6 @@ const styles = StyleSheet.create({
   amountText: {
     color: '#10B981',
   },
-  errorItem: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  errorRow: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#DC2626',
-    marginBottom: 4,
-  },
-  errorDetail: {
-    fontSize: 13,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#7F1D1D',
-    marginTop: 4,
-  },
 });
 
 export default ImportPaymentsModal;
-
