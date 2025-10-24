@@ -19,9 +19,36 @@ const schedulerService = new SchedulerService();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - production only
+// CORS configuration
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? (process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'])
+  : [
+      'http://localhost:3000',
+      'http://localhost:8080',
+      'http://localhost:8081',
+      'http://localhost:8088',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:8081',
+      'http://127.0.0.1:8088'
+    ];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN?.split(',') || ['https://financeapp-areluna.vercel.app'],
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // In development, log rejected origins for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ CORS: Origem rejeitada: ${origin}`);
+      }
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
