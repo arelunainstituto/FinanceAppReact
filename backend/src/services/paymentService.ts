@@ -735,4 +735,338 @@ export class PaymentService {
       );
     }
   }
+
+  async previewExcelImport(fileBuffer: Buffer): Promise<{
+    matches: {
+      excelRow: number;
+      clientName: string;
+      amount: number;
+      description: string;
+      status: string;
+      matchedPayment: {
+        paymentId: string;
+        contractNumber: string;
+        dueDate: string;
+        amount: number;
+        clientName: string;
+      } | null;
+      error?: string;
+    }[];
+    errors: {
+      row: number;
+      error: string;
+    }[];
+  }> {
+    console.log('🔍 previewExcelImport CALLED! Buffer size:', fileBuffer.length);
+    
+    const matches: {
+      excelRow: number;
+      clientName: string;
+      amount: number;
+      description: string;
+      status: string;
+      matchedPayment: {
+        paymentId: string;
+        contractNumber: string;
+        dueDate: string;
+        amount: number;
+        clientName: string;
+      } | null;
+      error?: string;
+    }[] = [];
+    
+    const errors: {
+      row: number;
+      error: string;
+    }[] = [];
+
+    try {
+      // Ler arquivo Excel
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw createError('Planilha vazia ou sem abas', 400);
+      }
+      
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Converter para JSON
+      const data: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      if (!data || data.length === 0) {
+        throw createError('Planilha completamente vazia', 400);
+      }
+      
+      if (data.length <= 1) {
+        throw createError('Planilha vazia ou sem dados (apenas cabeçalho)', 400);
+      }
+
+      // Encontrar índices das colunas
+      const headers = data[0] as string[];
+      
+      if (!headers || headers.length === 0) {
+        throw createError('Cabeçalho da planilha vazio', 400);
+      }
+      
+      const descricaoIndex = headers.findIndex(h => 
+        h && h.toLowerCase().includes('descri')
+      );
+      const statusIndex = headers.findIndex(h => 
+        h && (h.toLowerCase() === 'status' || h.toLowerCase() === 'ok')
+      );
+      const amountIndex = headers.findIndex(h => 
+        h && (h.toLowerCase().includes('amount') || h.toLowerCase().includes('valor') || h.toLowerCase().includes('total'))
+      );
+
+      if (descricaoIndex === -1) {
+        throw createError('Coluna "Descrição" não encontrada na planilha', 400);
+      }
+
+      if (statusIndex === -1) {
+        throw createError('Coluna "Status" não encontrada na planilha', 400);
+      }
+
+      // Cache de dados
+      console.log('📦 Loading all data into cache...');
+      const allClients = await this.clientRepository.findAll();
+      const allContracts = await this.contractRepository.findAll();
+      const allPayments = await this.paymentRepository.findAll();
+      console.log(`📦 Cache loaded: ${allClients.length} clients, ${allContracts.length} contracts, ${allPayments.length} payments`);
+
+      // Processar cada linha
+      console.log(`📊 Processing ${data.length - 1} rows for preview...`);
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i] as any[];
+        
+        if (!row || row.length === 0) continue;
+        
+        try {
+          const descricao = row[descricaoIndex];
+          const status = row[statusIndex];
+          const amountValue = amountIndex !== -1 ? row[amountIndex] : null;
+          
+          // Verificar se contém "SEPA PAYMENT FOR"
+          if (!descricao || typeof descricao !== 'string' || !descricao.toUpperCase().includes('SEPA PAYMENT FOR')) {
+            continue;
+          }
+          
+          // Verificar se status é "OK"
+          const statusUpper = status ? status.toString().toUpperCase() : '';
+          if (!statusUpper || statusUpper !== 'OK') {
+            continue;
+          }
+
+          // Extrair nome do cliente
+          const clientNameMatch = descricao.match(/SEPA PAYMENT FOR\s+(.+)/i);
+          if (!clientNameMatch || !clientNameMatch[1]) {
+            errors.push({
+              row: i + 1,
+              error: 'Não foi possível extrair o nome do cliente da descrição'
+            });
+            continue;
+          }
+          
+          const clientName = clientNameMatch[1].trim();
+          
+          // Buscar cliente
+          const client = allClients.find(c => 
+            c.first_name.toLowerCase() === clientName.toLowerCase()
+          );
+          
+          let matchedPayment = null;
+          let errorMessage: string | undefined = undefined;
+          let excelAmount = 0;
+
+          // Processar valor do Excel
+          if (amountValue !== null && amountValue !== undefined && amountValue !== '') {
+            if (typeof amountValue === 'number') {
+              excelAmount = Math.abs(amountValue);
+            } else {
+              const cleanedValue = amountValue.toString()
+                .replace(/[€$R\s]/g, '')
+                .replace(',', '.');
+              excelAmount = Math.abs(parseFloat(cleanedValue));
+            }
+          }
+          
+          if (!client) {
+            errorMessage = `Cliente "${clientName}" não encontrado no banco de dados`;
+          } else {
+            // Buscar contratos do cliente
+            const clientContracts = allContracts.filter(c => c.client_id === client.id);
+            
+            if (clientContracts.length === 0) {
+              errorMessage = `Cliente "${clientName}" não possui contratos`;
+            } else {
+              // Buscar o pagamento pendente mais antigo
+              let oldestPendingPayment: Payment | null = null;
+              let oldestDueDate: Date | null = null;
+              
+              for (const contract of clientContracts) {
+                const payments = allPayments.filter(p => p.contract_id === contract.id);
+                const pendingPayments = payments.filter(p => p.status === 'pending');
+                
+                for (const payment of pendingPayments) {
+                  const dueDate = new Date(payment.due_date);
+                  if (!oldestDueDate || dueDate < oldestDueDate) {
+                    oldestDueDate = dueDate;
+                    oldestPendingPayment = payment;
+                  }
+                }
+              }
+              
+              if (!oldestPendingPayment) {
+                errorMessage = `Cliente "${clientName}" não possui pagamentos pendentes`;
+              } else {
+                // Verificar se o valor bate
+                if (excelAmount > 0) {
+                  const difference = Math.abs(excelAmount - oldestPendingPayment.amount);
+                  if (difference > 0.01) {
+                    errorMessage = `Valor da planilha (€${excelAmount.toFixed(2)}) não corresponde ao valor do pagamento (€${oldestPendingPayment.amount.toFixed(2)})`;
+                  }
+                }
+                
+                // Se não houver erro, criar o match
+                if (!errorMessage) {
+                  const contract = allContracts.find(c => c.id === oldestPendingPayment!.contract_id);
+                  matchedPayment = {
+                    paymentId: oldestPendingPayment.id,
+                    contractNumber: contract?.contract_number || 'N/A',
+                    dueDate: new Date(oldestPendingPayment.due_date).toLocaleDateString('pt-BR'),
+                    amount: oldestPendingPayment.amount,
+                    clientName: client.first_name
+                  };
+                }
+              }
+            }
+          }
+          
+          matches.push({
+            excelRow: i + 1,
+            clientName,
+            amount: excelAmount,
+            description: descricao,
+            status: statusUpper,
+            matchedPayment,
+            error: errorMessage
+          });
+          
+        } catch (rowError) {
+          errors.push({
+            row: i + 1,
+            error: `Erro ao processar linha: ${rowError instanceof Error ? rowError.message : 'Erro desconhecido'}`
+          });
+        }
+      }
+      
+      return {
+        matches,
+        errors
+      };
+      
+    } catch (error) {
+      console.error('Error processing Excel preview:', error);
+      throw createError(
+        `Erro ao processar planilha: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        500
+      );
+    }
+  }
+
+  async confirmExcelImport(paymentIds: string[]): Promise<{
+    success: {
+      paymentId: string;
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+    }[];
+    errors: {
+      paymentId: string;
+      error: string;
+    }[];
+  }> {
+    console.log('✅ confirmExcelImport CALLED! Processing', paymentIds.length, 'payments');
+    
+    const successfulPayments: {
+      paymentId: string;
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+    }[] = [];
+    
+    const errors: {
+      paymentId: string;
+      error: string;
+    }[] = [];
+
+    // Cache de dados
+    const allContracts = await this.contractRepository.findAll();
+    const allClients = await this.clientRepository.findAll();
+    const businessDay = getCurrentOrLastBusinessDay();
+
+    for (const paymentId of paymentIds) {
+      try {
+        // Buscar o pagamento
+        const payment = await this.paymentRepository.findById(paymentId);
+        
+        if (!payment) {
+          errors.push({
+            paymentId,
+            error: 'Pagamento não encontrado'
+          });
+          continue;
+        }
+
+        if (payment.status !== 'pending') {
+          errors.push({
+            paymentId,
+            error: 'Pagamento já foi processado'
+          });
+          continue;
+        }
+
+        // Atualizar o pagamento
+        const updatedPayment = await this.paymentRepository.update(paymentId, {
+          status: 'paid',
+          paid_amount: payment.amount,
+          paid_date: businessDay,
+          payment_method: 'Stripe'
+        });
+        
+        if (!updatedPayment) {
+          errors.push({
+            paymentId,
+            error: 'Erro ao atualizar o pagamento'
+          });
+          continue;
+        }
+
+        // Buscar informações do contrato e cliente
+        const contract = allContracts.find(c => c.id === payment.contract_id);
+        const client = contract ? allClients.find(c => c.id === contract.client_id) : null;
+        
+        successfulPayments.push({
+          paymentId: updatedPayment.id,
+          clientName: client?.first_name || 'Desconhecido',
+          amount: payment.amount,
+          contractNumber: contract?.contract_number || 'N/A',
+          dueDate: new Date(payment.due_date).toLocaleDateString('pt-BR')
+        });
+        
+      } catch (rowError) {
+        errors.push({
+          paymentId,
+          error: `Erro ao processar pagamento: ${rowError instanceof Error ? rowError.message : 'Erro desconhecido'}`
+        });
+      }
+    }
+    
+    return {
+      success: successfulPayments,
+      errors
+    };
+  }
 }

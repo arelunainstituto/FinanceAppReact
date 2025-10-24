@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+
+para o backend use sempre a porta 3030
+para o servidor frontend use sempre a porta 8088
