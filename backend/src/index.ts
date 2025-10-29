@@ -11,7 +11,7 @@ import { SchedulerService } from './services/schedulerService';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3030;
 
 // Initialize scheduler service
 const schedulerService = new SchedulerService();
@@ -26,10 +26,12 @@ const allowedOrigins = process.env.NODE_ENV === 'production'
       'http://localhost:3000',
       'http://localhost:8080',
       'http://localhost:8081',
+      'http://localhost:8082',
       'http://localhost:8088',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
       'http://127.0.0.1:8081',
+      'http://127.0.0.1:8082',
       'http://127.0.0.1:8088'
     ];
 

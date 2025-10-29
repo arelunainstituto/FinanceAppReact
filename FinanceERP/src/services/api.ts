@@ -15,8 +15,8 @@ const getApiBaseUrl = () => {
     
     // Development: localhost
     if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-      console.log('🌐 Using localhost API URL: http://localhost:3000/api');
-      return 'http://localhost:3000/api';
+      console.log('🌐 Using localhost API URL: http://localhost:3030/api');
+      return 'http://localhost:3030/api';
     }
     
     // Production: Use same domain as frontend ONLY for main production domain

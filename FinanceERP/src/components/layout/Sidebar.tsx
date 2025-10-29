@@ -27,11 +27,13 @@ const menuItems: MenuItem[] = [
   { id: 'clients', title: 'Clientes', icon: 'people-outline', route: 'Clients', section: 'gestao' },
   { id: 'contracts', title: 'Contratos', icon: 'document-text-outline', route: 'Contracts', section: 'gestao' },
   { id: 'payments', title: 'Pagamentos', icon: 'card-outline', route: 'Payments', section: 'gestao' },
+  { id: 'ai-analyst', title: 'AI Analyst', icon: 'chatbubbles-outline', route: 'AIAnalyst', section: 'ferramentas' },
 ];
 
 const sectionTitles = {
   principal: 'Principal',
   gestao: 'Gestão',
+  ferramentas: 'Ferramentas',
   configuracoes: 'Configurações'
 };
 
@@ -104,6 +106,7 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({ activeRoute }) => {
       <ScrollView style={styles.menu} showsVerticalScrollIndicator={false}>
         {renderMenuSection('principal')}
         {renderMenuSection('gestao')}
+        {renderMenuSection('ferramentas')}
         {renderMenuSection('configuracoes')}
       </ScrollView>
 
