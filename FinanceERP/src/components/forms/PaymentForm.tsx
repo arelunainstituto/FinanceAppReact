@@ -15,6 +15,10 @@ import NumericInput from '../common/NumericInput';
 import Button from '../common/Button';
 import DatePicker from '../common/DatePicker';
 import ApiService from '../../services/api';
+import {
+  convertDateFromApiFormat,
+  convertDateToApiFormat,
+} from '../../utils/dateFormatUtils';
 
 interface PaymentFormProps {
   visible: boolean;
@@ -64,8 +68,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       setFormData({
         contract_id: payment.contract_id || '',
         amount: payment.amount?.toString() || '',
-        due_date: payment.due_date || '',
-        paid_date: payment.paid_date || '',
+        due_date: convertDateFromApiFormat(payment.due_date || ''),
+        paid_date: convertDateFromApiFormat(payment.paid_date || ''),
         status: payment.status || 'pending',
         payment_method: payment.payment_method || '',
         notes: payment.notes || '',
@@ -206,6 +210,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     if (!formData.due_date) {
       newErrors.due_date = 'Data de vencimento é obrigatória';
+    } else if (!convertDateToApiFormat(formData.due_date)) {
+      newErrors.due_date = 'Data de vencimento inválida';
+    }
+
+    if (formData.paid_date) {
+      const convertedPaidDate = convertDateToApiFormat(formData.paid_date);
+      if (!convertedPaidDate) {
+        newErrors.paid_date = 'Data de pagamento inválida';
+      }
     }
 
     setErrors(newErrors);
@@ -215,17 +228,66 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const paymentData = {
+    console.log('🔍 [PaymentForm] Form data before conversion:', formData);
+
+    const dueDateForApi = convertDateToApiFormat(formData.due_date);
+    const paidDateForApi = formData.paid_date
+      ? convertDateToApiFormat(formData.paid_date)
+      : '';
+
+    console.log('🔍 [PaymentForm] Due date conversion:', {
+      original: formData.due_date,
+      converted: dueDateForApi
+    });
+
+    if (!dueDateForApi) {
+      setErrors(prev => ({
+        ...prev,
+        due_date: 'Data de vencimento inválida',
+      }));
+      return;
+    }
+
+    // Importante: Sempre enviar todos os campos, mesmo os vazios, para garantir que a atualização funcione
+    const paymentData: any = {
       contract_id: formData.contract_id,
       amount: Number(formData.amount),
-      due_date: formData.due_date,
-      paid_date: formData.paid_date || undefined,
+      due_date: dueDateForApi,
       status: formData.status as 'pending' | 'paid' | 'overdue' | 'partial' | 'renegociado',
-      payment_method: formData.payment_method || undefined,
-      notes: formData.notes || undefined,
       payment_type: formData.payment_type as 'normalPayment' | 'manualPayment',
-      paid_amount: formData.paid_amount ? Number(formData.paid_amount) : undefined,
     };
+
+    // Adicionar campos opcionais apenas se tiverem valor
+    if (paidDateForApi) {
+      paymentData.paid_date = paidDateForApi;
+    }
+
+    if (formData.payment_method) {
+      paymentData.payment_method = formData.payment_method;
+    }
+
+    if (formData.notes) {
+      paymentData.notes = formData.notes;
+    }
+
+    if (formData.paid_amount) {
+      paymentData.paid_amount = Number(formData.paid_amount);
+    }
+
+    console.log('🔍 [PaymentForm] Payment data to be submitted:', paymentData);
+    console.log('🔍 [PaymentForm] Checking due_date field:', {
+      exists: 'due_date' in paymentData,
+      value: paymentData.due_date,
+      type: typeof paymentData.due_date,
+      allKeys: Object.keys(paymentData)
+    });
+
+    // CRITICAL: Verificação final antes de enviar
+    if (!paymentData.due_date) {
+      console.error('❌ [PaymentForm] ERRO CRÍTICO: due_date está vazio antes de enviar!');
+      Alert.alert('Erro', 'Data de vencimento não foi definida corretamente');
+      return;
+    }
 
     await onSubmit(paymentData);
   };
@@ -377,6 +439,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={formData.paid_date}
                 onDateChange={(value) => updateField('paid_date', value)}
                 placeholder="DD/MM/AAAA"
+        error={errors.paid_date}
               />
             </View>
 

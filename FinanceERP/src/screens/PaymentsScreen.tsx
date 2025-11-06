@@ -415,23 +415,34 @@ const PaymentsScreen: React.FC = () => {
   const handleSubmitPayment = async (paymentData: Omit<Payment, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setIsSubmitting(true);
-      
+
+      console.log('🔍 [PaymentsScreen] Submitting payment:', {
+        isEditing: !!editingPayment,
+        paymentId: editingPayment?.id,
+        paymentData
+      });
+
       if (editingPayment) {
         // Update existing payment
+        console.log('🔍 [PaymentsScreen] Updating payment with ID:', editingPayment.id);
         const response = await ApiService.updatePayment(editingPayment.id, paymentData);
+        console.log('🔍 [PaymentsScreen] Update response:', response);
         if (response.success && response.data) {
-          setPayments(payments.map(p => p.id === editingPayment.id ? response.data : p));
+          // Reload payments from server to ensure data consistency
+          await loadPayments();
           Alert.alert('Sucesso', 'Pagamento actualizado com sucesso');
         }
       } else {
         // Create new payment
+        console.log('🔍 [PaymentsScreen] Creating new payment');
         const response = await ApiService.createPayment(paymentData);
+        console.log('🔍 [PaymentsScreen] Create response:', response);
         if (response.success && response.data) {
           setPayments([...payments, response.data]);
           Alert.alert('Sucesso', 'Pagamento criado com sucesso');
         }
       }
-      
+
       setShowPaymentForm(false);
       setEditingPayment(null);
     } catch (error) {

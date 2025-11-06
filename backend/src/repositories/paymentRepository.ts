@@ -1065,6 +1065,11 @@ export class PaymentRepository {
 
   async update(id: string, paymentData: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<Payment | null> {
     try {
+      console.log('🔍 [PaymentRepository] update called:', {
+        paymentId: id,
+        paymentData
+      });
+
       // Convert undefined to null for fields that need to be cleared in Supabase
       const supabaseData = { ...paymentData };
       if (paymentData.paid_date === undefined) {
@@ -1073,6 +1078,11 @@ export class PaymentRepository {
       if (paymentData.paid_amount === undefined) {
         supabaseData.paid_amount = null as any;
       }
+
+      console.log('🔍 [PaymentRepository] Data to be sent to Supabase:', {
+        id,
+        supabaseData
+      });
 
       const { data, error } = await supabase
         .from('payments')
@@ -1087,11 +1097,16 @@ export class PaymentRepository {
         `)
         .single();
 
-      if (error) throw error;
-      
+      if (error) {
+        console.error('❌ [PaymentRepository] Supabase error:', error);
+        throw error;
+      }
+
+      console.log('🔍 [PaymentRepository] Data returned from Supabase:', data);
+
       return data || null;
     } catch (error) {
-      console.error('Error updating payment:', error);
+      console.error('❌ [PaymentRepository] Error updating payment:', error);
       throw new Error('Failed to update payment');
     }
   }

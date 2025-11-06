@@ -26,6 +26,7 @@ const AIAnalystScreen: React.FC = () => {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
+  const isFeatureEnabled = false;
 
   // Chave para salvar o histórico no AsyncStorage
   const CHAT_HISTORY_KEY = `chat_history_${user?.id || 'default'}`;
@@ -101,6 +102,11 @@ const AIAnalystScreen: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
+    if (isFeatureEnabled === false) {
+      Alert.alert('Em desenvolvimento', 'Esta funcionalidade ainda está em fase de implementação.');
+      return;
+    }
+
     if (!inputText.trim() || isLoading) return;
 
     const userMessage: ChatMessage = {
@@ -277,12 +283,13 @@ const AIAnalystScreen: React.FC = () => {
               <Ionicons name="chatbubbles" size={24} color="#007AFF" />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>AI Analyst</Text>
-              <Text style={styles.headerSubtitle}>Assistente de Análise Financeira</Text>
+              <Text style={styles.headerTitle}>AI Analyst (Em Dev)</Text>
+              <Text style={styles.headerSubtitle}>Funcionalidade em desenvolvimento</Text>
             </View>
             <TouchableOpacity
-              style={styles.clearButton}
+              style={[styles.clearButton, !isFeatureEnabled && styles.clearButtonDisabled]}
               onPress={clearChatHistory}
+              disabled={!isFeatureEnabled}
             >
               <Ionicons name="trash-outline" size={20} color="#6B7280" />
             </TouchableOpacity>
@@ -298,6 +305,16 @@ const AIAnalystScreen: React.FC = () => {
           onContentSizeChange={scrollToBottom}
         >
           {messages.map((message, index) => renderMessage(message, index))}
+
+          {isFeatureEnabled === false && (
+            <View style={styles.devInfoContainer}>
+              <Ionicons name="construct-outline" size={24} color="#2563EB" style={styles.devInfoIcon} />
+              <Text style={styles.devInfoTitle}>Em desenvolvimento</Text>
+              <Text style={styles.devInfoDescription}>
+                Estamos finalizando esta funcionalidade. Em breve você poderá interagir com o assistente inteligente diretamente por aqui.
+              </Text>
+            </View>
+          )}
           
           {isLoading && (
             <View style={styles.loadingContainer}>
@@ -327,7 +344,7 @@ const AIAnalystScreen: React.FC = () => {
               placeholderTextColor="#8E8E93"
               multiline
               maxLength={1000}
-              editable={!isLoading}
+              editable={isFeatureEnabled && !isLoading}
               autoFocus={false}
               onKeyPress={handleKeyPress}
               returnKeyType="default"
@@ -346,12 +363,12 @@ const AIAnalystScreen: React.FC = () => {
                 (!inputText.trim() || isLoading) && styles.sendButtonDisabled
               ]}
               onPress={handleSendMessage}
-              disabled={!inputText.trim() || isLoading}
+              disabled={!isFeatureEnabled || !inputText.trim() || isLoading}
             >
               <Ionicons
                 name="send"
                 size={20}
-                color={(!inputText.trim() || isLoading) ? '#8E8E93' : '#FFFFFF'}
+                color={(!isFeatureEnabled || !inputText.trim() || isLoading) ? '#8E8E93' : '#FFFFFF'}
               />
             </TouchableOpacity>
           </View>
@@ -405,6 +422,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
+  },
+  clearButtonDisabled: {
+    opacity: 0.4,
+  },
+  devInfoContainer: {
+    marginTop: 24,
+    marginHorizontal: 8,
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+  },
+  devInfoIcon: {
+    marginBottom: 12,
+  },
+  devInfoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    marginBottom: 8,
+  },
+  devInfoDescription: {
+    fontSize: 14,
+    color: '#1E3A8A',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   headerTitle: {
     fontSize: 24,

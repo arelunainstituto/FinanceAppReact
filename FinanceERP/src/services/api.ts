@@ -304,10 +304,18 @@ class ApiService {
   }
 
   async updatePayment(id: string, payment: Partial<Payment>): Promise<ApiResponse<Payment>> {
-    return this.request(`/payments/${id}`, {
+    console.log('🔍 [ApiService] updatePayment called:', {
+      paymentId: id,
+      paymentData: payment
+    });
+
+    const response = await this.request(`/payments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payment),
     });
+
+    console.log('🔍 [ApiService] updatePayment response:', response);
+    return response;
   }
 
   async deletePayment(id: string): Promise<ApiResponse<void>> {

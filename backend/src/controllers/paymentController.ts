@@ -242,14 +242,23 @@ export class PaymentController {
     try {
       const { id } = req.params;
       const paymentData = req.body;
+
+      console.log('🔍 [PaymentController] updatePayment called:', {
+        paymentId: id,
+        paymentData
+      });
+
       const payment = await this.paymentService.updatePayment(id, paymentData);
-      
+
+      console.log('🔍 [PaymentController] updatePayment result:', payment);
+
       res.status(200).json({
         success: true,
         message: 'Payment updated successfully',
         data: payment,
       });
     } catch (error) {
+      console.error('❌ [PaymentController] Error updating payment:', error);
       next(error);
     }
   };

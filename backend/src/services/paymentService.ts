@@ -102,11 +102,18 @@ export class PaymentService {
   }
 
   async updatePayment(id: string, paymentData: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<Payment> {
+    console.log('🔍 [PaymentService] updatePayment called:', {
+      paymentId: id,
+      paymentData
+    });
+
     // Check if payment exists
     const existingPayment = await this.paymentRepository.findById(id);
     if (!existingPayment) {
       throw createError('Payment not found', 404);
     }
+
+    console.log('🔍 [PaymentService] Existing payment:', existingPayment);
 
     // Validate amount if being updated
     if (paymentData.amount !== undefined && paymentData.amount <= 0) {
@@ -127,7 +134,7 @@ export class PaymentService {
         const businessDay = getCurrentOrLastBusinessDay();
         paymentData.paid_date = businessDay;
       }
-      
+
       // If paid_amount is not provided or is 0, set it to the original payment amount
       if (paymentData.paid_amount === undefined || paymentData.paid_amount === 0) {
         paymentData.paid_amount = existingPayment.amount;
@@ -146,10 +153,14 @@ export class PaymentService {
       notes: paymentData.notes === '' ? undefined : paymentData.notes,
     };
 
+    console.log('🔍 [PaymentService] Cleaned data to be saved:', cleanedData);
+
     const updatedPayment = await this.paymentRepository.update(id, cleanedData);
     if (!updatedPayment) {
       throw createError('Failed to update payment', 500);
     }
+
+    console.log('🔍 [PaymentService] Updated payment from database:', updatedPayment);
 
     return updatedPayment;
   }
