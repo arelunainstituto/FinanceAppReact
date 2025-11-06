@@ -15,8 +15,8 @@ const getApiBaseUrl = () => {
     
     // Development: localhost
     if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-      console.log('🌐 Using localhost API URL: http://localhost:3000/api');
-      return 'http://localhost:3000/api';
+      console.log('🌐 Using localhost API URL: http://localhost:3030/api');
+      return 'http://localhost:3030/api';
     }
     
     // Production: Use same domain as frontend ONLY for main production domain
@@ -304,10 +304,18 @@ class ApiService {
   }
 
   async updatePayment(id: string, payment: Partial<Payment>): Promise<ApiResponse<Payment>> {
-    return this.request(`/payments/${id}`, {
+    console.log('🔍 [ApiService] updatePayment called:', {
+      paymentId: id,
+      paymentData: payment
+    });
+
+    const response = await this.request(`/payments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payment),
     });
+
+    console.log('🔍 [ApiService] updatePayment response:', response);
+    return response;
   }
 
   async deletePayment(id: string): Promise<ApiResponse<void>> {
@@ -363,6 +371,80 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  async previewImportFromExcel(file: File | { uri: string; name: string; type: string }): Promise<ApiResponse<{
+    matches: {
+      excelRow: number;
+      clientName: string;
+      amount: number;
+      description: string;
+      status: string;
+      matchedPayment: {
+        paymentId: string;
+        contractNumber: string;
+        dueDate: string;
+        amount: number;
+        clientName: string;
+      } | null;
+      error?: string;
+    }[];
+    errors: {
+      row: number;
+      error: string;
+    }[];
+  }>> {
+    const token = await AsyncStorage.getItem('auth_token');
+    
+    const formData = new FormData();
+    
+    // Check if it's a File object (web) or React Native file object
+    if (file instanceof File) {
+      formData.append('file', file);
+    } else {
+      // React Native file object
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      } as any);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/payments/import/preview`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+        // Don't set Content-Type, let the browser set it with the boundary
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('🌐 Error response:', errorText);
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async confirmImport(paymentIds: string[]): Promise<ApiResponse<{
+    success: {
+      paymentId: string;
+      clientName: string;
+      amount: number;
+      contractNumber: string;
+      dueDate: string;
+    }[];
+    errors: {
+      paymentId: string;
+      error: string;
+    }[];
+  }>> {
+    return this.request('/payments/import/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIds }),
+    });
   }
 
   async processManualPayment(id: string, amount: number, usePositiveBalance?: number, paymentMethod?: string): Promise<ApiResponse<{

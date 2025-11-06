@@ -27,11 +27,13 @@ const menuItems: MenuItem[] = [
   { id: 'clients', title: 'Clientes', icon: 'people-outline', route: 'Clients', section: 'gestao' },
   { id: 'contracts', title: 'Contratos', icon: 'document-text-outline', route: 'Contracts', section: 'gestao' },
   { id: 'payments', title: 'Pagamentos', icon: 'card-outline', route: 'Payments', section: 'gestao' },
+  { id: 'ai-analyst', title: 'AI Analyst (Em Dev)', icon: 'chatbubbles-outline', route: 'AIAnalyst', section: 'ferramentas' },
 ];
 
 const sectionTitles = {
   principal: 'Principal',
   gestao: 'Gestão',
+  ferramentas: 'Ferramentas',
   configuracoes: 'Configurações'
 };
 
@@ -54,33 +56,47 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({ activeRoute }) => {
     return (
       <View key={sectionKey} style={styles.menuSection}>
         <Text style={styles.sectionTitle}>{sectionTitles[sectionKey as keyof typeof sectionTitles]}</Text>
-        {sectionItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[
-              styles.menuItem,
-              activeRoute === item.route && styles.activeMenuItem,
-            ]}
-            onPress={() => handleMenuPress(item.route)}
-          >
-            <View style={styles.menuIconContainer}>
-              <Ionicons
-                name={item.icon}
-                size={22}
-                color={activeRoute === item.route ? '#FFFFFF' : '#6B7280'}
-                style={styles.menuIcon}
-              />
-            </View>
-            <Text
+        {sectionItems.map((item) => {
+          const isDisabled = item.route === 'AIAnalyst';
+          const isActive = !isDisabled && activeRoute === item.route;
+
+          const handlePress = () => {
+            if (!isDisabled) {
+              handleMenuPress(item.route);
+            }
+          };
+
+          return (
+            <TouchableOpacity
+              key={item.id}
               style={[
-                styles.menuText,
-                activeRoute === item.route && styles.activeMenuText,
+                styles.menuItem,
+                isActive && styles.activeMenuItem,
+                isDisabled && styles.disabledMenuItem,
               ]}
+              onPress={handlePress}
+              disabled={isDisabled}
             >
-              {item.title}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.menuIconContainer}>
+                <Ionicons
+                  name={item.icon}
+                  size={22}
+                  color={isActive ? '#FFFFFF' : isDisabled ? '#CBD5F5' : '#6B7280'}
+                  style={styles.menuIcon}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.menuText,
+                  isActive && styles.activeMenuText,
+                  isDisabled && styles.disabledMenuText,
+                ]}
+              >
+                {item.title}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   }, [activeRoute, handleMenuPress]);
@@ -104,6 +120,7 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({ activeRoute }) => {
       <ScrollView style={styles.menu} showsVerticalScrollIndicator={false}>
         {renderMenuSection('principal')}
         {renderMenuSection('gestao')}
+        {renderMenuSection('ferramentas')}
         {renderMenuSection('configuracoes')}
       </ScrollView>
 
@@ -324,6 +341,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 8,
     letterSpacing: 0.3,
+  },
+  disabledMenuItem: {
+    opacity: 0.6,
+  },
+  disabledMenuText: {
+    color: '#CBD5F5',
   },
 });
 

@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Dimensions,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import Sidebar from './Sidebar';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -15,6 +20,8 @@ const SIDEBAR_WIDTH = 280; // Fixed sidebar width from Sidebar.tsx
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, activeRoute }) => {
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const navigation = useNavigation();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -23,6 +30,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, activeRoute }) => {
 
     return () => subscription?.remove();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{ name: 'Auth' }],
+      });
+    }
+  }, [isLoading, user, navigation]);
+
+  const handleGoToLogin = useCallback(() => {
+    navigation.getParent()?.reset({
+      index: 0,
+      routes: [{ name: 'Auth' }],
+    });
+  }, [navigation]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.fullscreenContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.fullscreenText}>Verificando sessão...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.fullscreenContainer}>
+        <Text style={styles.unauthorizedTitle}>Sessão necessária</Text>
+        <Text style={styles.unauthorizedSubtitle}>
+          Faça login para visualizar este conteúdo.
+        </Text>
+        <TouchableOpacity style={styles.loginButton} onPress={handleGoToLogin}>
+          <Text style={styles.loginButtonText}>Ir para o login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const contentWidth = screenWidth - SIDEBAR_WIDTH;
 
@@ -62,6 +108,44 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#F8F9FA',
     overflow: 'scroll', // Enable scroll for main content
+  },
+  fullscreenContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 24,
+  },
+  fullscreenText: {
+    marginTop: 16,
+    fontSize: 15,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  unauthorizedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  unauthorizedSubtitle: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  loginButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

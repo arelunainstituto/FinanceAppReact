@@ -242,14 +242,23 @@ export class PaymentController {
     try {
       const { id } = req.params;
       const paymentData = req.body;
+
+      console.log('🔍 [PaymentController] updatePayment called:', {
+        paymentId: id,
+        paymentData
+      });
+
       const payment = await this.paymentService.updatePayment(id, paymentData);
-      
+
+      console.log('🔍 [PaymentController] updatePayment result:', payment);
+
       res.status(200).json({
         success: true,
         message: 'Payment updated successfully',
         data: payment,
       });
     } catch (error) {
+      console.error('❌ [PaymentController] Error updating payment:', error);
       next(error);
     }
   };
@@ -409,6 +418,76 @@ export class PaymentController {
       });
     } catch (error) {
       console.log('❌ Error in importPaymentsFromExcel:', error);
+      next(error);
+    }
+  };
+
+  previewImportFromExcel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      console.log('🔍 previewImportFromExcel called');
+      
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: 'No file uploaded',
+        });
+        return;
+      }
+
+      console.log('📄 File uploaded for preview:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+
+      const result = await this.paymentService.previewExcelImport(req.file.buffer);
+      
+      console.log('✅ Preview completed:', {
+        matchesCount: result.matches.length,
+        errorCount: result.errors.length
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: `Pré-visualização concluída. ${result.matches.length} pagamento(s) encontrado(s), ${result.errors.length} erro(s).`,
+        data: result,
+      });
+    } catch (error) {
+      console.log('❌ Error in previewImportFromExcel:', error);
+      next(error);
+    }
+  };
+
+  confirmImport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      console.log('✅ confirmImport called');
+      
+      const { paymentIds } = req.body;
+
+      if (!paymentIds || !Array.isArray(paymentIds) || paymentIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Lista de IDs de pagamentos não fornecida ou vazia',
+        });
+        return;
+      }
+
+      console.log('📋 Payment IDs to confirm:', paymentIds);
+
+      const result = await this.paymentService.confirmExcelImport(paymentIds);
+      
+      console.log('✅ Confirmation completed:', {
+        successCount: result.success.length,
+        errorCount: result.errors.length
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: `Importação confirmada. ${result.success.length} pagamento(s) processado(s) com sucesso, ${result.errors.length} erro(s).`,
+        data: result,
+      });
+    } catch (error) {
+      console.log('❌ Error in confirmImport:', error);
       next(error);
     }
   };

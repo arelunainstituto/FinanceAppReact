@@ -18,6 +18,14 @@ export const convertDateToApiFormat = (dateString: string): string => {
     return dateString;
   }
 
+  // Verifica se está no formato ISO completo (YYYY-MM-DDTHH:MM:SSZ)
+  const isoWithTimeRegex = /^(\d{4})-(\d{2})-(\d{2})T/;
+  const isoWithTimeMatch = dateString.match(isoWithTimeRegex);
+  if (isoWithTimeMatch) {
+    const [, year, month, day] = isoWithTimeMatch;
+    return `${year}-${month}-${day}`;
+  }
+
   // Converte do formato DD/MM/YYYY para YYYY-MM-DD
   const ddmmyyyyRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
   const match = dateString.match(ddmmyyyyRegex);
@@ -101,6 +109,14 @@ export const convertDateFromApiFormat = (dateString: string): string => {
   
   if (match) {
     const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+
+  // Converte do formato ISO completo (YYYY-MM-DDTHH:MM:SSZ)
+  const isoWithTimeRegex = /^(\d{4})-(\d{2})-(\d{2})T/;
+  const isoWithTimeMatch = dateString.match(isoWithTimeRegex);
+  if (isoWithTimeMatch) {
+    const [, year, month, day] = isoWithTimeMatch;
     return `${day}/${month}/${year}`;
   }
 

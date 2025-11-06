@@ -9,6 +9,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import ClientsScreen from '../screens/ClientsScreen';
 import ContractsScreen from '../screens/ContractsScreen';
 import PaymentsScreen from '../screens/PaymentsScreen';
+import AIAnalystScreen from '../screens/AIAnalystScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 
 // Navigation types
@@ -27,6 +28,7 @@ export type MainStackParamList = {
   Clients: undefined;
   Contracts: { clientId?: string; clientName?: string } | undefined;
   Payments: { contractId?: string } | undefined;
+  AIAnalyst: undefined;
 };
 
 const RootStack = createStackNavigator<RootStackParamList>();
@@ -64,6 +66,10 @@ const MainNavigator = () => {
       <MainStack.Screen
         name="Payments"
         component={PaymentsScreen}
+      />
+      <MainStack.Screen
+        name="AIAnalyst"
+        component={AIAnalystScreen}
       />
     </MainStack.Navigator>
   );
