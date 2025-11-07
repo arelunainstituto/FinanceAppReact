@@ -55,7 +55,7 @@ class AIAnalystService {
         message,
         userName,
         userEmail,
-        history: history.slice(-10) // Enviar apenas as últimas 10 mensagens para contexto
+        history: history.slice(-5) // Enviar apenas as últimas 5 mensagens para contexto
       };
 
       console.log('🤖 Enviando mensagem para N8N:', {
@@ -86,15 +86,28 @@ class AIAnalystService {
         throw new Error(`Erro do servidor N8N: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json() as any;
+      let result: any = null;
+      const rawResponseText = await response.text();
+      
+      if (rawResponseText && rawResponseText.trim()) {
+        try {
+          result = JSON.parse(rawResponseText);
+        } catch (parseError) {
+          console.error('🤖 Erro ao fazer parse da resposta:', parseError);
+          result = null;
+        }
+      } else {
+        console.log('🤖 Resposta vazia do N8N');
+        result = null;
+      }
       console.log('🤖 Resultado processado:', result);
       console.log('🤖 Tipo do resultado:', typeof result);
       console.log('🤖 Chaves do resultado:', Object.keys(result || {}));
 
       // Extrair a mensagem do formato do N8N
-      let responseText = 'Resposta recebida';
+      let responseText: string = 'Resposta recebida';
       
-      // Verificar se o resultado está vazio
+      // Verificar se o resultado está vazio ou inválido
       if (!result || (typeof result === 'object' && Object.keys(result).length === 0)) {
         console.log('🤖 Resultado vazio do N8N, usando resposta simulada');
         // Resposta simulada enquanto o N8N não está funcionando

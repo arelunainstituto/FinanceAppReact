@@ -80,7 +80,7 @@ class AIAnalystService {
         message,
         userName: user.name || user.email,
         userEmail: user.email,
-        history: history.slice(-10) // Enviar apenas as últimas 10 mensagens para contexto
+        history: history.slice(-5) // Enviar apenas as últimas 5 mensagens para contexto
       };
 
       console.log('🤖 Enviando mensagem para AI Analyst:', {

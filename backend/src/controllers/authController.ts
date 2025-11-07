@@ -107,4 +107,26 @@ export class AuthController {
       next(error);
     }
   };
+
+  verifyToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // The user ID and email come from the JWT token (set by auth middleware)
+      const userId = (req as any).user?.userId;
+      const email = (req as any).user?.email;
+      
+      if (!userId || !email) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      const result = await this.authService.verifyToken(userId, email);
+      
+      res.status(200).json({
+        message: 'Token verification successful',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

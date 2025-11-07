@@ -1,6 +1,6 @@
 import { UserRepository } from '../repositories/userRepository';
 import { generateToken } from '../utils/jwt';
-import { AuthResponse, LoginRequest, RegisterRequest } from '../models';
+import { AuthResponse, LoginRequest, RegisterRequest, User } from '../models';
 import { createError } from '../middlewares/errorHandler';
 import { supabase } from '../config/database';
 
@@ -153,6 +153,37 @@ export class AuthService {
     } catch (error) {
       console.error('Reset password error:', error);
       throw error;
+    }
+  }
+
+  async verifyToken(userId: string, email: string): Promise<{ valid: boolean; user: Omit<User, 'password'> | null }> {
+    try {
+      console.log('=== VERIFY TOKEN ===');
+      console.log('User ID:', userId);
+      console.log('Email:', email);
+
+      // Try to get user from database
+      const user = await this.userRepository.findById(userId);
+      
+      if (!user) {
+        console.log('User not found');
+        return { valid: false, user: null };
+      }
+
+      // Verify email matches
+      if (user.email !== email) {
+        console.log('Email mismatch');
+        return { valid: false, user: null };
+      }
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      console.log('Token verification successful');
+      
+      return { valid: true, user: userWithoutPassword };
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return { valid: false, user: null };
     }
   }
 }

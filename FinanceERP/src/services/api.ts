@@ -489,6 +489,12 @@ class ApiService {
       body: JSON.stringify({ token, newPassword }),
     });
   }
+
+  async verifyToken(): Promise<ApiResponse<{ valid: boolean; user: User | null }>> {
+    return this.request<{ valid: boolean; user: User | null }>('/auth/verify', {
+      method: 'GET',
+    });
+  }
 }
 
 export default new ApiService();

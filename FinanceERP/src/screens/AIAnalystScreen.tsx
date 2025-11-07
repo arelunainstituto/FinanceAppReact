@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import MainLayout from '../components/layout/MainLayout';
 import AIAnalystService, { ChatMessage } from '../services/aiAnalystService';
+import RequestQueueService, { QueuedRequest } from '../services/requestQueueService';
 
 const AIAnalystScreen: React.FC = () => {
   const { user } = useAuth();
@@ -24,16 +25,25 @@ const AIAnalystScreen: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<Map<string, QueuedRequest>>(new Map());
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
-  const isFeatureEnabled = false;
+  const isFeatureEnabled = true;
+  const unsubscribeRefs = useRef<Array<() => void>>([]);
 
   // Chave para salvar o histórico no AsyncStorage
   const CHAT_HISTORY_KEY = `chat_history_${user?.id || 'default'}`;
 
-  // Carregar histórico salvo ao montar o componente
+  // Inicializar fila de requisições
   useEffect(() => {
+    RequestQueueService.initialize();
     loadChatHistory();
+    monitorPendingRequests();
+
+    return () => {
+      // Limpar subscriptions ao desmontar
+      unsubscribeRefs.current.forEach(unsub => unsub());
+    };
   }, [user?.id]);
 
   // Salvar histórico sempre que as mensagens mudarem
@@ -42,6 +52,16 @@ const AIAnalystScreen: React.FC = () => {
       saveChatHistory();
     }
   }, [messages]);
+
+  const monitorPendingRequests = () => {
+    // Verificar requisições pendentes ao montar
+    const pending = RequestQueueService.getQueuedRequests('completed');
+    pending.forEach(request => {
+      if (request.type === 'ai-chat' && request.response) {
+        handleRequestCompleted(request);
+      }
+    });
+  };
 
   const loadChatHistory = async () => {
     try {
@@ -101,6 +121,36 @@ const AIAnalystScreen: React.FC = () => {
     }, 100);
   };
 
+  const handleRequestCompleted = (request: QueuedRequest) => {
+    if (request.status === 'completed' && request.response) {
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: request.response.response || 'Resposta recebida',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      setPendingRequests(prev => {
+        const updated = new Map(prev);
+        updated.delete(request.id);
+        return updated;
+      });
+      scrollToBottom();
+      console.log('✅ Resposta do AI Analyst recebida:', request.id);
+    } else if (request.status === 'failed') {
+      setPendingRequests(prev => {
+        const updated = new Map(prev);
+        updated.delete(request.id);
+        return updated;
+      });
+      Alert.alert(
+        'Erro',
+        request.error || 'Não foi possível processar a mensagem. Tente novamente.'
+      );
+      console.error('❌ Falha ao processar mensagem:', request.id, request.error);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (isFeatureEnabled === false) {
       Alert.alert('Em desenvolvimento', 'Esta funcionalidade ainda está em fase de implementação.');
@@ -115,34 +165,63 @@ const AIAnalystScreen: React.FC = () => {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputText('');
-    setIsLoading(true);
-    textInputRef.current?.blur(); // Remove o foco do input
+    setIsLoading(false); // Não bloquear UI enquanto aguarda resposta
+    textInputRef.current?.blur();
 
+    // Adicionar à fila de requisições
+    const requestId = RequestQueueService.addRequest({
+      type: 'ai-chat',
+      payload: {
+        message: userMessage.content,
+        user: user!,
+        history: updatedMessages
+      }
+    });
+
+    // Adicionar aos requisições pendentes no estado
+    const request = RequestQueueService.getRequest(requestId);
+    if (request) {
+      setPendingRequests(prev => new Map(prev).set(requestId, request));
+
+      // Inscrever para atualizações da requisição
+      const unsubscribe = RequestQueueService.onRequestUpdate(requestId, (updatedRequest) => {
+        setPendingRequests(prev => new Map(prev).set(requestId, updatedRequest));
+        if (updatedRequest.status === 'completed' || updatedRequest.status === 'failed') {
+          handleRequestCompleted(updatedRequest);
+        }
+      });
+
+      unsubscribeRefs.current.push(unsubscribe);
+    }
+
+    // Processar requisição em background (passando apenas as últimas 5 mensagens)
+    processQueuedRequest(requestId, userMessage.content, user!, updatedMessages.slice(-5));
+  };
+
+  const processQueuedRequest = async (
+    requestId: string,
+    message: string,
+    user: any,
+    history: ChatMessage[]
+  ) => {
     try {
-      const response = await AIAnalystService.sendMessage(
-        userMessage.content,
-        user!,
-        messages
-      );
+      RequestQueueService.updateRequest(requestId, { status: 'processing' });
 
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date()
-      };
+      const response = await AIAnalystService.sendMessage(message, user, history);
 
-      setMessages(prev => [...prev, assistantMessage]);
+      RequestQueueService.updateRequest(requestId, {
+        status: 'completed',
+        response: response
+      });
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      Alert.alert(
-        'Erro',
-        'Não foi possível enviar a mensagem. Verifique sua conexão e tente novamente.'
-      );
-    } finally {
-      setIsLoading(false);
-      scrollToBottom();
+      console.error('Erro ao processar requisição:', error);
+      RequestQueueService.updateRequest(requestId, {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
     }
   };
 
@@ -283,8 +362,8 @@ const AIAnalystScreen: React.FC = () => {
               <Ionicons name="chatbubbles" size={24} color="#007AFF" />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>AI Analyst (Em Dev)</Text>
-              <Text style={styles.headerSubtitle}>Funcionalidade em desenvolvimento</Text>
+              <Text style={styles.headerTitle}>AI Analyst</Text>
+              <Text style={styles.headerSubtitle}>Seu assistente de análise financeira</Text>
             </View>
             <TouchableOpacity
               style={[styles.clearButton, !isFeatureEnabled && styles.clearButtonDisabled]}
@@ -306,16 +385,6 @@ const AIAnalystScreen: React.FC = () => {
         >
           {messages.map((message, index) => renderMessage(message, index))}
 
-          {isFeatureEnabled === false && (
-            <View style={styles.devInfoContainer}>
-              <Ionicons name="construct-outline" size={24} color="#2563EB" style={styles.devInfoIcon} />
-              <Text style={styles.devInfoTitle}>Em desenvolvimento</Text>
-              <Text style={styles.devInfoDescription}>
-                Estamos finalizando esta funcionalidade. Em breve você poderá interagir com o assistente inteligente diretamente por aqui.
-              </Text>
-            </View>
-          )}
-          
           {isLoading && (
             <View style={styles.loadingContainer}>
               <View style={styles.loadingBubble}>
@@ -344,7 +413,7 @@ const AIAnalystScreen: React.FC = () => {
               placeholderTextColor="#8E8E93"
               multiline
               maxLength={1000}
-              editable={isFeatureEnabled && !isLoading}
+              editable={isFeatureEnabled}
               autoFocus={false}
               onKeyPress={handleKeyPress}
               returnKeyType="default"
@@ -360,15 +429,15 @@ const AIAnalystScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+                !inputText.trim() && styles.sendButtonDisabled
               ]}
               onPress={handleSendMessage}
-              disabled={!isFeatureEnabled || !inputText.trim() || isLoading}
+              disabled={!isFeatureEnabled || !inputText.trim()}
             >
               <Ionicons
                 name="send"
                 size={20}
-                color={(!isFeatureEnabled || !inputText.trim() || isLoading) ? '#8E8E93' : '#FFFFFF'}
+                color={(!isFeatureEnabled || !inputText.trim()) ? '#8E8E93' : '#FFFFFF'}
               />
             </TouchableOpacity>
           </View>

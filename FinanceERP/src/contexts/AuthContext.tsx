@@ -23,7 +23,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Validate that the user data is complete
         if (parsedUserData && parsedUserData.id && parsedUserData.email) {
-          setUser(parsedUserData);
+          try {
+            // Verify token with backend
+            console.log('🔐 Verifying token with backend...');
+            const response = await ApiService.verifyToken();
+            
+            if (response.data?.valid && response.data?.user) {
+              console.log('✅ Token is valid, user authenticated');
+              setUser(parsedUserData);
+            } else {
+              console.log('❌ Token verification failed, clearing auth data');
+              await AsyncStorage.removeItem('auth_token');
+              await AsyncStorage.removeItem('user_data');
+            }
+          } catch (verifyError) {
+            console.error('❌ Token verification error:', verifyError);
+            // Clear potentially invalid data
+            await AsyncStorage.removeItem('auth_token');
+            await AsyncStorage.removeItem('user_data');
+          }
         } else {
           // Clear invalid data
           await AsyncStorage.removeItem('auth_token');

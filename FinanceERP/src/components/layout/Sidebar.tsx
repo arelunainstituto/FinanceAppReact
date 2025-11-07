@@ -27,7 +27,7 @@ const menuItems: MenuItem[] = [
   { id: 'clients', title: 'Clientes', icon: 'people-outline', route: 'Clients', section: 'gestao' },
   { id: 'contracts', title: 'Contratos', icon: 'document-text-outline', route: 'Contracts', section: 'gestao' },
   { id: 'payments', title: 'Pagamentos', icon: 'card-outline', route: 'Payments', section: 'gestao' },
-  { id: 'ai-analyst', title: 'AI Analyst (Em Dev)', icon: 'chatbubbles-outline', route: 'AIAnalyst', section: 'ferramentas' },
+  { id: 'ai-analyst', title: 'AI Analyst', icon: 'chatbubbles-outline', route: 'AIAnalyst', section: 'ferramentas' },
 ];
 
 const sectionTitles = {
@@ -57,13 +57,11 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({ activeRoute }) => {
       <View key={sectionKey} style={styles.menuSection}>
         <Text style={styles.sectionTitle}>{sectionTitles[sectionKey as keyof typeof sectionTitles]}</Text>
         {sectionItems.map((item) => {
-          const isDisabled = item.route === 'AIAnalyst';
-          const isActive = !isDisabled && activeRoute === item.route;
+          const isDisabled = false;
+          const isActive = activeRoute === item.route;
 
           const handlePress = () => {
-            if (!isDisabled) {
-              handleMenuPress(item.route);
-            }
+            handleMenuPress(item.route);
           };
 
           return (
