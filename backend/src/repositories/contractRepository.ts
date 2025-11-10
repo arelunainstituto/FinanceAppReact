@@ -1,5 +1,6 @@
 import { supabase } from '../config/database';
 import { Contract } from '../models';
+import { sumMoneyValues } from '../utils/moneyUtils';
 
 export interface PaginationOptions {
   page?: number;
@@ -539,9 +540,9 @@ export class ContractRepository {
          payment.payment_type === 'normalPayment')
       ) || [];
       
-      const totalPaidFromPayments = paidPayments.reduce((sum: number, payment: any) => {
-        return sum + parseFloat(payment.amount || '0');
-      }, 0);
+      // Usar sumMoneyValues para somar com precisão
+      const paymentAmounts = paidPayments.map((payment: any) => parseFloat(payment.amount || '0'));
+      const totalPaidFromPayments = paymentAmounts.length > 0 ? sumMoneyValues(...paymentAmounts) : 0;
 
       // New calculation: percentage based only on actual payments made
       const totalPaid = totalPaidFromPayments;

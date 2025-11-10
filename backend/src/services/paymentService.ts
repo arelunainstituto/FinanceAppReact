@@ -5,6 +5,7 @@ import { Payment } from '../models';
 import { createError } from '../middlewares/errorHandler';
 import { getCurrentOrLastBusinessDay } from '../utils/dateUtils';
 import * as XLSX from 'xlsx';
+import { sumMoneyValues, subtractMoneyValues } from '../utils/moneyUtils';
 
 export class PaymentService {
   private paymentRepository: PaymentRepository;
@@ -342,8 +343,8 @@ export class PaymentService {
       throw createError('Positive balance usage cannot be negative', 400);
     }
 
-    // Calcular valor final da parcela após aplicar saldo positivo
-    const finalInstallmentValue = Math.max(0, originalAmount - usePositiveBalance);
+    // Calcular valor final da parcela após aplicar saldo positivo (usando operações precisas)
+    const finalInstallmentValue = Math.max(0, subtractMoneyValues(originalAmount, usePositiveBalance));
     
     // Validar se o valor pago é positivo
     if (amount <= 0) {
@@ -351,25 +352,25 @@ export class PaymentService {
     }
 
     let contractUpdated = false;
-    let newPositiveBalance = contractPositiveBalance - usePositiveBalance;
+    let newPositiveBalance = subtractMoneyValues(contractPositiveBalance, usePositiveBalance);
     let newNegativeBalance = contractNegativeBalance;
     let message = '';
     
     // Caso 1: Pagamento parcial (menor que o valor da parcela)
     if (amount < finalInstallmentValue) {
-      const remainingDebt = finalInstallmentValue - amount;
+      const remainingDebt = subtractMoneyValues(finalInstallmentValue, amount);
       
       // Atualizar pagamento como pago com valor parcial e data automática
       const businessDay = getCurrentOrLastBusinessDay();
       const updatedPayment = await this.paymentRepository.update(paymentId, {
         status: 'paid',
-        paid_amount: amount + usePositiveBalance, // Valor efetivamente pago + saldo usado
+        paid_amount: sumMoneyValues(amount, usePositiveBalance), // Valor efetivamente pago + saldo usado
         paid_date: businessDay,
         payment_method: paymentMethod
       });
       
       // Adicionar valor restante ao saldo negativo do contrato
-      newNegativeBalance = contractNegativeBalance + remainingDebt;
+      newNegativeBalance = sumMoneyValues(contractNegativeBalance, remainingDebt);
       
       // Atualizar saldos do contrato
       await this.contractRepository.update(payment.contract_id, {
@@ -424,7 +425,7 @@ export class PaymentService {
     
     // Caso 3: Pagamento excedente
     if (amount > finalInstallmentValue) {
-      const excessAmount = amount - finalInstallmentValue;
+      const excessAmount = subtractMoneyValues(amount, finalInstallmentValue);
       
       // Atualizar pagamento como pago com data automática (dia útil atual ou anterior)
       const businessDay = getCurrentOrLastBusinessDay();
@@ -439,9 +440,9 @@ export class PaymentService {
       if (contractNegativeBalance > 0) {
         if (excessAmount >= contractNegativeBalance) {
           // Excesso cobre toda a dívida
-          const remainingExcess = excessAmount - contractNegativeBalance;
+          const remainingExcess = subtractMoneyValues(excessAmount, contractNegativeBalance);
           newNegativeBalance = 0;
-          newPositiveBalance += remainingExcess;
+          newPositiveBalance = sumMoneyValues(newPositiveBalance, remainingExcess);
           message = `Payment completed with excess. Debt of R$ ${contractNegativeBalance.toFixed(2)} cleared.`;
           
           if (remainingExcess > 0) {
@@ -453,7 +454,7 @@ export class PaymentService {
           }
         } else {
           // Excesso não cobre toda a dívida
-          newNegativeBalance = contractNegativeBalance - excessAmount;
+          newNegativeBalance = subtractMoneyValues(contractNegativeBalance, excessAmount);
           message = `Payment completed with excess applied to debt. Remaining debt: R$ ${newNegativeBalance.toFixed(2)}`;
           
           if (usePositiveBalance > 0) {
@@ -462,7 +463,7 @@ export class PaymentService {
         }
       } else {
         // Não há dívida, adicionar excesso ao saldo positivo
-        newPositiveBalance += excessAmount;
+        newPositiveBalance = sumMoneyValues(newPositiveBalance, excessAmount);
         message = `Payment completed with excess. R$ ${excessAmount.toFixed(2)} added to positive balance.`;
         
         if (usePositiveBalance > 0) {

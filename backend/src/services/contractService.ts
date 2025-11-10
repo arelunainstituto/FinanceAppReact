@@ -3,6 +3,7 @@ import { ClientRepository } from '../repositories/clientRepository';
 import { PaymentRepository } from '../repositories/paymentRepository';
 import { Contract, Payment } from '../models';
 import { createError } from '../middlewares/errorHandler';
+import { divideIntoInstallments, subtractMoneyValues } from '../utils/moneyUtils';
 
 export class ContractService {
   private contractRepository: ContractRepository;
@@ -252,10 +253,13 @@ export class ContractService {
       const totalValue = Number(contract.value);
       const downPaymentValue = Number(contract.down_payment) || 0;
       const numberOfPayments = Number(contract.number_of_payments);
+      
+      // Obter o método de pagamento do contrato (se definido)
+      const paymentMethod = (contract as any).payment_method || undefined;
 
-      // Calcular valor das parcelas (valor total - entrada) / número de parcelas
-      const remainingValue = totalValue - downPaymentValue;
-      const installmentValue = remainingValue / numberOfPayments;
+      // Calcular valor das parcelas usando função precisa (evita erros de arredondamento)
+      const remainingValue = subtractMoneyValues(totalValue, downPaymentValue);
+      const installmentValues = divideIntoInstallments(remainingValue, numberOfPayments);
 
       // Criar entrada se houver
       if (downPaymentValue > 0) {
@@ -264,7 +268,7 @@ export class ContractService {
           amount: downPaymentValue,
           due_date: startDate,
           status: 'pending',
-          payment_method: undefined,
+          payment_method: paymentMethod,
           payment_type: 'downPayment',
           notes: 'Entrada do contrato',
           external_id: undefined,
@@ -272,7 +276,7 @@ export class ContractService {
         });
       }
 
-      // Criar parcelas mensais
+      // Criar parcelas mensais com valores precisos
       for (let i = 1; i <= numberOfPayments; i++) {
         const dueDate = new Date(startDate);
         dueDate.setMonth(startDate.getMonth() + i);
@@ -283,10 +287,10 @@ export class ContractService {
 
         payments.push({
           contract_id: contract.id,
-          amount: installmentValue,
+          amount: installmentValues[i - 1], // Usar valor preciso da parcela
           due_date: dueDate,
           status: status,
-          payment_method: undefined,
+          payment_method: paymentMethod,
           payment_type: 'normalPayment',
           notes: `${i}/${numberOfPayments}`,
           external_id: undefined,

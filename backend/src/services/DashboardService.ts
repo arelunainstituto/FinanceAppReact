@@ -1,4 +1,5 @@
 import { supabase } from '../config/database';
+import { sumMoneyValues } from '../utils/moneyUtils';
 
 export interface DashboardStats {
   totalClients: number;
@@ -97,17 +98,18 @@ export class DashboardService {
         this.getPaymentsByStatus()
       ]);
 
-      // Calcular receita total (soma dos contratos)
-      const totalRevenue = contractsValueResult.data?.reduce((sum: number, contract: any) => sum + contract.value, 0) || 0;
+      // Calcular receita total (soma dos contratos) com precisão
+      const contractValues = contractsValueResult.data?.map((contract: any) => Number(contract.value)) || [];
+      const totalRevenue = contractValues.length > 0 ? sumMoneyValues(...contractValues) : 0;
 
-      // NOVO: Calcular total efetivamente recebido
-      const totalReceived = paidPaymentsResult.data?.reduce((sum: number, payment: any) => {
+      // NOVO: Calcular total efetivamente recebido com precisão
+      const paymentValues = paidPaymentsResult.data?.map((payment: any) => {
         // Usar paid_amount se existir e for > 0, caso contrário usar amount
-        const paymentValue = (payment.paid_amount && payment.paid_amount > 0) 
+        return (payment.paid_amount && payment.paid_amount > 0) 
           ? Number(payment.paid_amount)
           : Number(payment.amount);
-        return sum + paymentValue;
-      }, 0) || 0;
+      }) || [];
+      const totalReceived = paymentValues.length > 0 ? sumMoneyValues(...paymentValues) : 0;
 
       return {
         totalClients: clientsResult.count || 0,
@@ -187,7 +189,7 @@ export class DashboardService {
             if (!monthlyData[monthKey]) {
               monthlyData[monthKey] = { month, year: date.getFullYear(), revenue: 0 };
             }
-            monthlyData[monthKey].revenue += paymentValue;
+            monthlyData[monthKey].revenue = sumMoneyValues(monthlyData[monthKey].revenue, paymentValue);
           }
         }
       });
