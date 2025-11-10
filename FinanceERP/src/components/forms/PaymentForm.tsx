@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Payment, Contract } from '../../types';
@@ -19,6 +20,7 @@ import {
   convertDateFromApiFormat,
   convertDateToApiFormat,
 } from '../../utils/dateFormatUtils';
+import { PAYMENT_METHODS } from '../../constants/paymentMethods';
 
 interface PaymentFormProps {
   visible: boolean;
@@ -469,12 +471,44 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 </View>
               </View>
 
-              <Input
-                label="Método de Pagamento"
-                value={formData.payment_method}
-                onChangeText={(value) => updateField('payment_method', value)}
-                placeholder="Ex: PIX, Cartão, Dinheiro"
-              />
+              {/* Método de Pagamento */}
+              <View>
+                <Text style={styles.inputLabel}>Método de Pagamento</Text>
+                <View style={styles.paymentMethodContainer}>
+                  {PAYMENT_METHODS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.paymentMethodOption,
+                        formData.payment_method === option.value && styles.paymentMethodOptionSelected,
+                      ]}
+                      onPress={() => updateField('payment_method', option.value)}
+                    >
+                      {option.isCustomImage ? (
+                        <Image
+                          source={option.icon as any}
+                          resizeMode="contain"
+                          style={styles.paymentMethodIcon}
+                        />
+                      ) : (
+                        <Ionicons 
+                          name={option.icon as any} 
+                          size={18} 
+                          color={formData.payment_method === option.value ? '#FFFFFF' : '#64748B'} 
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.paymentMethodText,
+                          formData.payment_method === option.value && styles.paymentMethodTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               <NumericInput
                 label="Valor Pago"
@@ -723,6 +757,38 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  paymentMethodContainer: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  paymentMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    gap: 12,
+  },
+  paymentMethodOptionSelected: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    flex: 1,
+  },
+  paymentMethodTextSelected: {
+    color: '#FFFFFF',
+  },
+  paymentMethodIcon: {
+    width: 18,
+    height: 18,
   },
 });
 

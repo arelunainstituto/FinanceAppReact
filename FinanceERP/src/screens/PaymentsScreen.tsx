@@ -21,6 +21,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import { formatCurrency } from '../utils/currency';
 import { formatDate } from '../utils/dateUtils';
 import { convertDateFiltersToApiFormat } from '../utils/dateFormatUtils';
+import { PAYMENT_METHODS } from '../constants/paymentMethods';
 import PaymentForm from '../components/forms/PaymentForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import AdvancedFilters from '../components/filters/AdvancedFilters';
@@ -633,6 +634,14 @@ const PaymentsScreen: React.FC = () => {
     }
   };
 
+  const getPaymentMethodLabel = (methodValue: string | undefined): string => {
+    if (!methodValue) return 'N/A';
+    
+    // Procurar na lista de métodos para encontrar o label formatado corretamente
+    const method = PAYMENT_METHODS.find(m => m.value === methodValue);
+    return method ? method.label : methodValue;
+  };
+
   const columns: UltimaTableColumn[] = [
     {
       key: 'contract',
@@ -794,7 +803,7 @@ const PaymentsScreen: React.FC = () => {
       sortable: false,
       render: (payment: Payment) => (
         <Text style={{ fontSize: 14, color: '#64748B' }} numberOfLines={1} ellipsizeMode="tail">
-          {payment.payment_method || 'N/A'}
+          {getPaymentMethodLabel(payment.payment_method)}
         </Text>
       ),
     },

@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Modal } from './common/Modal';
 import { formatCurrency } from '../utils/currency';
 import { formatNumberInput } from '../utils/numberFormat';
+import { PAYMENT_METHODS } from '../constants/paymentMethods';
 
 interface ManualPaymentModalProps {
   visible: boolean;
@@ -41,24 +42,8 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Payment method options - same as PaymentForm
-  const paymentMethodOptions = [
-    { value: 'DD', label: 'DD' },
-    { value: 'TRF', label: 'Transferência' },
-    { value: 'Stripe', label: 'Stripe' },
-    { value: 'PP', label: 'PP' },
-    { value: 'Receção', label: 'Receção' },
-    { value: 'TRF ou RECEÇÃO', label: 'TRF ou Receção' },
-    { value: 'TRF - OP', label: 'TRF - OP' },
-    { value: 'bank_transfer', label: 'Transferência Bancária' },
-    { value: 'Cheque', label: 'Cheque' },
-    { value: 'Cheque/Misto', label: 'Cheque/Misto' },
-    { value: 'Aditamento', label: 'Aditamento' },
-    { value: 'DD + TB', label: 'DD + TB' },
-    { value: 'Ordenado', label: 'Ordenado' },
-    { value: 'Numerário', label: 'Numerário' },
-    { value: 'MB Way', label: 'MB Way' },
-  ];
+  // Payment method options
+  const paymentMethodOptions = PAYMENT_METHODS;
 
   // Reset form when modal opens - MUST be called before any early returns
   useEffect(() => {

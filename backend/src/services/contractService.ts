@@ -83,6 +83,10 @@ export class ContractService {
     // Process date fields - convert empty strings to null and format dates
     const processedData = { ...contractData } as any;
     
+    // Extract payment_method (será usado nas parcelas, não no contrato)
+    const paymentMethod = processedData.payment_method;
+    delete processedData.payment_method;
+    
     // Set default status if not provided
     if (!processedData.status) {
       processedData.status = 'ativo';
@@ -130,7 +134,7 @@ export class ContractService {
 
     // Generate automatic payments if required fields are present
     if (createdContract.start_date && createdContract.number_of_payments && createdContract.number_of_payments > 0) {
-      await this.generateAutomaticPayments(createdContract);
+      await this.generateAutomaticPayments(createdContract, paymentMethod);
     }
 
     return createdContract;
@@ -234,7 +238,7 @@ export class ContractService {
    * Gera pagamentos automáticos para um contrato
    * Baseado nas regras de negócio definidas no newFunctionality.md
    */
-  private async generateAutomaticPayments(contract: Contract): Promise<void> {
+  private async generateAutomaticPayments(contract: Contract, paymentMethod?: string): Promise<void> {
     try {
       // Validações antes de gerar pagamentos
       if (!contract.start_date || !contract.number_of_payments || contract.number_of_payments <= 0) {
@@ -253,9 +257,6 @@ export class ContractService {
       const totalValue = Number(contract.value);
       const downPaymentValue = Number(contract.down_payment) || 0;
       const numberOfPayments = Number(contract.number_of_payments);
-      
-      // Obter o método de pagamento do contrato (se definido)
-      const paymentMethod = (contract as any).payment_method || undefined;
 
       // Calcular valor das parcelas usando função precisa (evita erros de arredondamento)
       const remainingValue = subtractMoneyValues(totalValue, downPaymentValue);

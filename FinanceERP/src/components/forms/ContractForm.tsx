@@ -16,10 +16,7 @@ import NumericInput from '../common/NumericInput';
 import Button from '../common/Button';
 import DatePicker from '../common/DatePicker';
 import ApiService from '../../services/api';
-
-// Import custom payment method icons
-import MbWayIcon from '../../../assets/mb_way.png';
-import MultibancoIcon from '../../../assets/multibanco.png';
+import { PAYMENT_METHODS } from '../../constants/paymentMethods';
 
 interface ContractFormProps {
   visible: boolean;
@@ -52,7 +49,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
     notes: '',
     down_payment: '',
     number_of_payments: '',
-    payment_method: 'transferencia', // Método padrão
+    payment_method: 'DD', // Método padrão
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -109,14 +106,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
   ];
 
   // Opções de método de pagamento
-  const paymentMethodOptions = [
-    { value: 'transferencia', label: 'Transferência Bancária', icon: 'card-outline', isCustomImage: false },
-    { value: 'dinheiro', label: 'Dinheiro', icon: 'cash-outline', isCustomImage: false },
-    { value: 'multibanco', label: 'Multibanco', icon: MultibancoIcon, isCustomImage: true },
-    { value: 'mbway', label: 'MB WAY', icon: MbWayIcon, isCustomImage: true },
-    { value: 'cartao', label: 'Cartão de Crédito/Débito', icon: 'card-outline', isCustomImage: false },
-    { value: 'cheque', label: 'Cheque', icon: 'document-text-outline', isCustomImage: false },
-  ];
+  const paymentMethodOptions = PAYMENT_METHODS;
 
   useEffect(() => {
     if (visible) {
@@ -142,7 +132,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
         notes: contract.notes || '',
         down_payment: contract.down_payment?.toString() || '',
         number_of_payments: contract.number_of_payments?.toString() || '',
-        payment_method: 'transferencia',
+        payment_method: 'DD',
       });
       
       // Find and set selected client
@@ -168,7 +158,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
         notes: '',
         down_payment: '',
         number_of_payments: '',
-        payment_method: 'transferencia',
+        payment_method: 'DD',
       });
       setSelectedClient(null);
     }
@@ -504,47 +494,49 @@ const ContractForm: React.FC<ContractFormProps> = ({
                 error={errors.number_of_payments}
               />
 
-              {/* Método de Pagamento das Parcelas */}
-              <View>
-                <Text style={styles.inputLabel}>Método de Pagamento das Parcelas</Text>
-                <View style={styles.paymentMethodContainer}>
-                  {paymentMethodOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.paymentMethodOption,
-                        formData.payment_method === option.value && styles.paymentMethodOptionSelected,
-                      ]}
-                      onPress={() => updateField('payment_method', option.value)}
-                    >
-                      {option.isCustomImage ? (
-                        <Image
-                          source={option.icon as any}
-                          resizeMode="contain"
-                          style={styles.paymentMethodIcon}
-                        />
-                      ) : (
-                        <Ionicons 
-                          name={option.icon as any} 
-                          size={20} 
-                          color={formData.payment_method === option.value ? '#FFFFFF' : '#64748B'} 
-                        />
-                      )}
-                      <Text
+              {/* Método de Pagamento das Parcelas - Apenas para novos contratos */}
+              {!contract && (
+                <View>
+                  <Text style={styles.inputLabel}>Método de Pagamento das Parcelas</Text>
+                  <View style={styles.paymentMethodContainer}>
+                    {paymentMethodOptions.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
                         style={[
-                          styles.paymentMethodText,
-                          formData.payment_method === option.value && styles.paymentMethodTextSelected,
+                          styles.paymentMethodOption,
+                          formData.payment_method === option.value && styles.paymentMethodOptionSelected,
                         ]}
+                        onPress={() => updateField('payment_method', option.value)}
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        {option.isCustomImage ? (
+                          <Image
+                            source={option.icon as any}
+                            resizeMode="contain"
+                            style={styles.paymentMethodIcon}
+                          />
+                        ) : (
+                          <Ionicons 
+                            name={option.icon as any} 
+                            size={20} 
+                            color={formData.payment_method === option.value ? '#FFFFFF' : '#64748B'} 
+                          />
+                        )}
+                        <Text
+                          style={[
+                            styles.paymentMethodText,
+                            formData.payment_method === option.value && styles.paymentMethodTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
-              {/* Prévia do Valor da Parcela */}
-              {installmentPreview && (
+              {/* Prévia do Valor da Parcela - Apenas para novos contratos */}
+              {!contract && installmentPreview && (
                 <View style={styles.installmentPreview}>
                   <View style={styles.previewHeader}>
                     <Ionicons name="calculator-outline" size={20} color="#3B82F6" />
