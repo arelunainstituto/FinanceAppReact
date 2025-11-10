@@ -25,5 +25,7 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
   { value: 'Numerário', label: 'Numerário', icon: 'cash-outline', isCustomImage: false },
   { value: 'multibanco', label: 'Multibanco', icon: MultibancoIcon, isCustomImage: true },
   { value: 'mbway', label: 'MB WAY', icon: MbWayIcon, isCustomImage: true },
+  { value: 'credit_card', label: 'Cartão de Crédito', icon: 'card-outline', isCustomImage: false },
+  { value: 'pix', label: 'PIX', icon: 'swap-vertical-outline', isCustomImage: false },
 ];
 

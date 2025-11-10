@@ -487,38 +487,41 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <View>
                 <Text style={styles.inputLabel}>Método de Pagamento</Text>
                 <View style={styles.paymentMethodContainer}>
-                  {PAYMENT_METHODS.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.paymentMethodOption,
-                        formData.payment_method === option.value && styles.paymentMethodOptionSelected,
-                      ]}
-                      onPress={() => updateField('payment_method', option.value)}
-                    >
-                      {option.isCustomImage ? (
-                        <Image
-                          source={option.icon as any}
-                          resizeMode="contain"
-                          style={styles.paymentMethodIcon}
-                        />
-                      ) : (
-                        <Ionicons 
-                          name={option.icon as any} 
-                          size={18} 
-                          color={formData.payment_method === option.value ? '#FFFFFF' : '#64748B'} 
-                        />
-                      )}
-                      <Text
+                  {PAYMENT_METHODS.map((option) => {
+                    const isSelected = formData.payment_method?.toLowerCase() === option.value.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
                         style={[
-                          styles.paymentMethodText,
-                          formData.payment_method === option.value && styles.paymentMethodTextSelected,
+                          styles.paymentMethodOption,
+                          isSelected && styles.paymentMethodOptionSelected,
                         ]}
+                        onPress={() => updateField('payment_method', option.value)}
                       >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        {option.isCustomImage ? (
+                          <Image
+                            source={option.icon as any}
+                            resizeMode="contain"
+                            style={styles.paymentMethodIcon}
+                          />
+                        ) : (
+                          <Ionicons 
+                            name={option.icon as any} 
+                            size={18} 
+                            color={isSelected ? '#FFFFFF' : '#64748B'} 
+                          />
+                        )}
+                        <Text
+                          style={[
+                            styles.paymentMethodText,
+                            isSelected && styles.paymentMethodTextSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 

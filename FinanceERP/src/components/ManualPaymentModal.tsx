@@ -24,6 +24,7 @@ interface ManualPaymentModalProps {
     status?: string;
     contract_id: string;
     paid_amount?: number;
+    payment_method?: string;
   } | null;
   contractPositiveBalance?: number;
   contractNegativeBalance?: number;
@@ -52,8 +53,14 @@ export const ManualPaymentModal: React.FC<ManualPaymentModalProps> = ({
       console.log('🔍 Modal ficou visível, resetando form');
       setPaymentAmount('');
       setUsePositiveBalance('0');
-      // Carregar o método de pagamento da parcela, se existir
-      setSelectedPaymentMethod(payment?.payment_method || '');
+      // Carregar o método de pagamento da parcela, se existir (normalizar para case-insensitive)
+      if (payment?.payment_method) {
+        const paymentMethod = payment.payment_method;
+        const matchedMethod = PAYMENT_METHODS.find(m => m.value.toLowerCase() === paymentMethod.toLowerCase());
+        setSelectedPaymentMethod(matchedMethod?.value || paymentMethod);
+      } else {
+        setSelectedPaymentMethod('');
+      }
     }
   }, [visible, payment?.payment_method]);
 
