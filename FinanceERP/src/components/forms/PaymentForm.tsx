@@ -84,7 +84,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         const contract = contracts.find(c => c.id === payment.contract_id);
         setSelectedContract(contract || null);
         
-        // Load contract balances for edit mode - CORREÇÃO APLICADA
+        // Load contract balances for edit mode
         if (contract) {
           loadContractBalances(contract.id);
         }
@@ -103,10 +103,22 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         paid_amount: '',
       });
       setSelectedContract(null);
-      setContractBalances(null); // CORREÇÃO APLICADA
+      setContractBalances(null);
     }
     setErrors({});
   }, [payment, visible, contracts]);
+
+  // Quando selecionar um contrato, usar o método de pagamento do contrato
+  useEffect(() => {
+    if (selectedContract && !payment) {
+      // Se está criando um novo pagamento (sem payment object), usar o método do contrato
+      const contractPaymentMethod = (selectedContract as any).payment_method || '';
+      setFormData(prev => ({
+        ...prev,
+        payment_method: contractPaymentMethod,
+      }));
+    }
+  }, [selectedContract, payment]);
 
   const loadContracts = async () => {
     try {
