@@ -359,7 +359,7 @@ export class PaymentService {
     // Caso 1: Pagamento parcial (menor que o valor da parcela)
     if (amount < finalInstallmentValue) {
       const remainingDebt = subtractMoneyValues(finalInstallmentValue, amount);
-      
+
       // Atualizar pagamento como pago com valor parcial e data automática
       const businessDay = getCurrentOrLastBusinessDay();
       const updatedPayment = await this.paymentRepository.update(paymentId, {

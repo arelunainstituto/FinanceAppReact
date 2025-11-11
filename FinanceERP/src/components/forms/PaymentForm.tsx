@@ -171,9 +171,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       if (field === 'paid_amount') {
         const paidAmount = Number(value);
         const totalAmount = Number(newData.amount);
-        
-        // If paid amount equals total amount, automatically set status to 'paid'
-        if (paidAmount > 0 && paidAmount === totalAmount) {
+
+        // If paid amount is greater than or equal to total amount, automatically set status to 'paid'
+        if (paidAmount > 0 && paidAmount >= totalAmount) {
           newData.status = 'paid';
           // Also set paid_date to today if not already set
           if (!newData.paid_date) {
