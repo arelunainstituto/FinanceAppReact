@@ -4,6 +4,10 @@ import { User } from '../models';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// Debug log
+console.log('🔐 [JWT CONFIG] JWT_EXPIRES_IN from env:', process.env.JWT_EXPIRES_IN);
+console.log('🔐 [JWT CONFIG] JWT_EXPIRES_IN final value:', JWT_EXPIRES_IN);
+
 export interface JwtPayload {
   userId: string;
   email: string;
