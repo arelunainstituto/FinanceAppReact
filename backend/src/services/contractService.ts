@@ -167,6 +167,11 @@ export class ContractService {
 
     // Process date fields - convert empty strings to null and format dates
     const processedData = { ...contractData } as any;
+
+    // IMPORTANTE: Remover payment_method se existir (esse campo não existe em contracts)
+    if (processedData.payment_method) {
+      delete processedData.payment_method;
+    }
     
     if (processedData.start_date === '') {
       processedData.start_date = null;
