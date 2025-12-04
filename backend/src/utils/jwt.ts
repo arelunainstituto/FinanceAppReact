@@ -15,15 +15,35 @@ export const generateToken = (user: Omit<User, 'password'>): string => {
     email: user.email,
   };
 
-  return jwt.sign(payload, JWT_SECRET, {
+  console.log('🔐 [JWT] Generating token for user:', user.id, user.email);
+  console.log('🔐 [JWT] Token will expire in:', JWT_EXPIRES_IN);
+
+  const token = jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   } as jwt.SignOptions);
+
+  console.log('✅ [JWT] Token generated successfully');
+  console.log('🔐 [JWT] Token length:', token.length);
+
+  return token;
 };
 
 export const verifyToken = (token: string): JwtPayload => {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
-  } catch (error) {
+    console.log('🔐 [JWT] Verifying token...');
+    console.log('🔐 [JWT] Using JWT_SECRET:', JWT_SECRET.substring(0, 10) + '...');
+    console.log('🔐 [JWT] Token expires in config:', JWT_EXPIRES_IN);
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+    console.log('✅ [JWT] Token verified successfully');
+    console.log('🔐 [JWT] User ID:', decoded.userId);
+    console.log('🔐 [JWT] Email:', decoded.email);
+
+    return decoded;
+  } catch (error: any) {
+    console.error('❌ [JWT] Token verification failed:', error.message);
+    console.error('❌ [JWT] Error name:', error.name);
     throw new Error('Invalid token');
   }
 };

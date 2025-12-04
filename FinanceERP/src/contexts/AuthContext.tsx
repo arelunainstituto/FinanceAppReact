@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
     });
 
-    // Check auth state every 30 seconds if user is logged in (backup mechanism)
+    // Check auth state every 5 minutes if user is logged in (backup mechanism)
     const interval = setInterval(async () => {
       if (user) {
         const token = await AsyncStorage.getItem('auth_token');
@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(null);
         }
       }
-    }, 30000); // Check every 30 seconds
+    }, 300000); // Check every 5 minutes (300000ms)
 
     return () => {
       unsubscribe();
