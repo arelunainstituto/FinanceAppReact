@@ -5,7 +5,6 @@ import contractRoutes from './contractRoutes';
 import paymentRoutes from './paymentRoutes';
 import dashboardRoutes from './dashboardRoutes';
 import aiAnalystRoutes from './aiAnalystRoutes';
-import testRoutes from './testRoutes';
 
 const router = Router();
 
@@ -16,7 +15,6 @@ router.use('/contracts', contractRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/ai-analyst', aiAnalystRoutes);
-router.use('/test', testRoutes); // TEMPORÁRIO: Para testes de logout automático
 
 // Health check route
 router.get('/health', (_req, res) => {
