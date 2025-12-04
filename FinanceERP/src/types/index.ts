@@ -94,6 +94,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  handleAuthError: () => Promise<void>;
 }
 
 export interface ApiResponse<T> {

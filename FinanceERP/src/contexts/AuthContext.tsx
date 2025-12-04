@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContextType, User } from '../types';
 import ApiService from '../services/api';
+import { authErrorEvent } from '../utils/authEvents';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -17,17 +18,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       const userData = await AsyncStorage.getItem('user_data');
-      
+
       if (token && userData) {
         const parsedUserData = JSON.parse(userData);
-        
+
         // Validate that the user data is complete
         if (parsedUserData && parsedUserData.id && parsedUserData.email) {
           try {
             // Verify token with backend
             console.log('🔐 Verifying token with backend...');
             const response = await ApiService.verifyToken();
-            
+
             if (response.data?.valid && response.data?.user) {
               console.log('✅ Token is valid, user authenticated');
               setUser(parsedUserData);
@@ -35,32 +36,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.log('❌ Token verification failed, clearing auth data');
               await AsyncStorage.removeItem('auth_token');
               await AsyncStorage.removeItem('user_data');
+              setUser(null);
             }
-          } catch (verifyError) {
+          } catch (verifyError: any) {
             console.error('❌ Token verification error:', verifyError);
-            // Clear potentially invalid data
-            await AsyncStorage.removeItem('auth_token');
-            await AsyncStorage.removeItem('user_data');
+            // If it's an auth error (401/403), the ApiService already cleared storage
+            // Just need to clear user state
+            if (verifyError.isAuthError) {
+              console.log('🚨 Auth error detected in verification, logging out user');
+              setUser(null);
+            } else {
+              // Clear potentially invalid data
+              await AsyncStorage.removeItem('auth_token');
+              await AsyncStorage.removeItem('user_data');
+              setUser(null);
+            }
           }
         } else {
           // Clear invalid data
           await AsyncStorage.removeItem('auth_token');
           await AsyncStorage.removeItem('user_data');
+          setUser(null);
         }
+      } else {
+        // No token or user data, ensure user is null
+        setUser(null);
       }
     } catch (error) {
       console.error('❌ Error checking auth state:', error);
       // Clear potentially corrupted data
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Monitor auth state and listen for auth errors
   useEffect(() => {
     checkAuthState();
-  }, []);
+
+    // Subscribe to auth error events for immediate logout
+    const unsubscribe = authErrorEvent.subscribe(() => {
+      console.log('🚨 Auth error event received - logging out immediately');
+      setUser(null);
+    });
+
+    // Check auth state every 30 seconds if user is logged in (backup mechanism)
+    const interval = setInterval(async () => {
+      if (user) {
+        const token = await AsyncStorage.getItem('auth_token');
+        if (!token) {
+          console.log('🚨 Token removed, logging out user');
+          setUser(null);
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -99,6 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
+      console.log('🚪 Logging out user');
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
       setUser(null);
@@ -107,12 +146,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Handle authentication errors from API calls
+  const handleAuthError = useCallback(async () => {
+    console.log('🚨 Handling authentication error - forcing logout');
+    await logout();
+  }, [logout]);
+
   const value: AuthContextType = useMemo(() => ({
     user,
     login,
     logout,
     isLoading,
-  }), [user, login, logout, isLoading]);
+    handleAuthError,
+  }), [user, login, logout, isLoading, handleAuthError]);
 
   return (
     <AuthContext.Provider value={value}>
