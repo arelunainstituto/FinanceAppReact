@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Client, Contract, Payment, User, ApiResponse, DashboardStats } from '../types';
+import { authErrorEvent } from '../utils/authEvents';
 
 // API Configuration - Dynamic URL based on current domain
 const getApiBaseUrl = () => {
@@ -59,10 +60,10 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
-    
+
     console.log('🌐 Making request to:', `${API_BASE_URL}${endpoint}`);
     console.log('🌐 Request headers:', headers);
-    
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
@@ -77,6 +78,26 @@ class ApiService {
     if (!response.ok) {
       const errorText = await response.text();
       console.log('🌐 Error response:', errorText);
+
+      // Handle authentication errors (token expired or invalid)
+      if (response.status === 401 || response.status === 403) {
+        console.log('🚨 Authentication error detected - clearing session');
+
+        // Clear authentication data
+        await AsyncStorage.removeItem('auth_token');
+        await AsyncStorage.removeItem('user_data');
+
+        // Emit auth error event to force immediate logout
+        console.log('📢 Emitting auth error event');
+        authErrorEvent.emit();
+
+        // Throw specific error for authentication failure
+        const authError = new Error('Session expired. Please login again.');
+        (authError as any).isAuthError = true;
+        (authError as any).status = response.status;
+        throw authError;
+      }
+
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
