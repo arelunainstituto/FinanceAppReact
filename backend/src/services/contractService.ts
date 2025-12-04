@@ -160,6 +160,11 @@ export class ContractService {
       }
     }
 
+    // Se estiver tentando mudar para 'liquidado', validar se todos os pagamentos estão pagos
+    if (contractData.status === 'liquidado' && existingContract.status !== 'liquidado') {
+      await this.validateLiquidadoStatus(id);
+    }
+
     // Process date fields - convert empty strings to null and format dates
     const processedData = { ...contractData } as any;
     
@@ -351,6 +356,73 @@ export class ContractService {
     } catch (error) {
       console.error('Error fetching contract balances:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Verifica se todos os pagamentos de um contrato estão pagos
+   */
+  async areAllPaymentsPaid(contractId: string): Promise<boolean> {
+    try {
+      const payments = await this.paymentRepository.findByContractId(contractId);
+
+      // Se não há pagamentos, considerar como não pago
+      if (payments.length === 0) {
+        return false;
+      }
+
+      // Verificar se todos os pagamentos estão com status 'paid'
+      const allPaid = payments.every(payment => payment.status === 'paid');
+
+      return allPaid;
+    } catch (error) {
+      console.error('Error checking if all payments are paid:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Marca o contrato como liquidado se todos os pagamentos estiverem pagos
+   * Retorna true se o status foi alterado, false caso contrário
+   */
+  async checkAndMarkAsLiquidado(contractId: string): Promise<boolean> {
+    try {
+      const contract = await this.contractRepository.findById(contractId);
+      if (!contract) {
+        throw createError('Contract not found', 404);
+      }
+
+      // Se já está liquidado, não fazer nada
+      if (contract.status === 'liquidado') {
+        return false;
+      }
+
+      // Verificar se todos os pagamentos estão pagos
+      const allPaid = await this.areAllPaymentsPaid(contractId);
+
+      if (allPaid) {
+        // Marcar como liquidado
+        await this.contractRepository.update(contractId, { status: 'liquidado' });
+        console.log(`✅ Contrato ${contractId} marcado como LIQUIDADO automaticamente`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking and marking contract as liquidado:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Valida se um contrato pode ser marcado como liquidado manualmente
+   * Lança erro se não puder
+   */
+  async validateLiquidadoStatus(contractId: string): Promise<void> {
+    const allPaid = await this.areAllPaymentsPaid(contractId);
+
+    if (!allPaid) {
+      throw createError('Não é possível marcar o contrato como liquidado. Existem pagamentos pendentes.', 400);
     }
   }
 }

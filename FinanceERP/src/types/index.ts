@@ -94,6 +94,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  handleAuthError: () => Promise<void>;
 }
 
 export interface ApiResponse<T> {
@@ -103,5 +104,5 @@ export interface ApiResponse<T> {
 }
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'failed' | 'renegociado';
-export type ContractStatus = 'ativo' | 'completed' | 'cancelled' | 'draft';
+export type ContractStatus = 'ativo' | 'completed' | 'cancelled' | 'draft' | 'liquidado';
 export type ClientStatus = 'ativo' | 'inactive' | 'prospect';

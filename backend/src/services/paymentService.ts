@@ -18,6 +18,32 @@ export class PaymentService {
     this.clientRepository = new ClientRepository();
   }
 
+  /**
+   * Verifica se todos os pagamentos de um contrato estão pagos e marca como liquidado se sim
+   */
+  private async checkAndMarkContractAsLiquidado(contractId: string): Promise<void> {
+    try {
+      const contract = await this.contractRepository.findById(contractId);
+      if (!contract || contract.status === 'liquidado') {
+        return;
+      }
+
+      const payments = await this.paymentRepository.findByContractId(contractId);
+      if (payments.length === 0) {
+        return;
+      }
+
+      const allPaid = payments.every(payment => payment.status === 'paid');
+      if (allPaid) {
+        await this.contractRepository.update(contractId, { status: 'liquidado' });
+        console.log(`✅ Contrato ${contractId} marcado como LIQUIDADO automaticamente`);
+      }
+    } catch (error) {
+      console.error('Error checking contract liquidation status:', error);
+      // Não falhar a operação se houver erro ao verificar status do contrato
+    }
+  }
+
   async getAllPayments(): Promise<Payment[]> {
     return this.paymentRepository.findAll();
   }
@@ -163,6 +189,11 @@ export class PaymentService {
 
     console.log('🔍 [PaymentService] Updated payment from database:', updatedPayment);
 
+    // Se o pagamento foi marcado como 'paid', verificar se o contrato deve ser marcado como liquidado
+    if (updatedPayment.status === 'paid') {
+      await this.checkAndMarkContractAsLiquidado(updatedPayment.contract_id);
+    }
+
     return updatedPayment;
   }
 
@@ -262,6 +293,9 @@ export class PaymentService {
     if (!updatedPayment) {
       throw createError('Failed to mark payment as paid', 500);
     }
+
+    // Verificar se o contrato deve ser marcado como liquidado
+    await this.checkAndMarkContractAsLiquidado(payment.contract_id);
 
     return {
       payment: updatedPayment,
@@ -386,7 +420,10 @@ export class PaymentService {
       }
       
       message += `. Remaining debt of R$ ${remainingDebt.toFixed(2)} added to contract balance. Total debt: R$ ${newNegativeBalance.toFixed(2)}`;
-      
+
+      // Verificar se o contrato deve ser marcado como liquidado
+      await this.checkAndMarkContractAsLiquidado(payment.contract_id);
+
       return {
         payment: updatedPayment!,
         contractUpdated,
@@ -415,7 +452,10 @@ export class PaymentService {
       } else {
         message = 'Payment completed successfully';
       }
-      
+
+      // Verificar se o contrato deve ser marcado como liquidado
+      await this.checkAndMarkContractAsLiquidado(payment.contract_id);
+
       return {
         payment: updatedPayment!,
         contractUpdated,
@@ -478,7 +518,10 @@ export class PaymentService {
         positive_balance: newPositiveBalance,
         negative_balance: newNegativeBalance
       });
-      
+
+      // Verificar se o contrato deve ser marcado como liquidado
+      await this.checkAndMarkContractAsLiquidado(payment.contract_id);
+
       return {
         payment: updatedPayment!,
         contractUpdated: true,
