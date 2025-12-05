@@ -4,7 +4,8 @@
   "ignore": ["src/**/*.test.ts", "node_modules"],
   "exec": "ts-node src/index.ts",
   "env": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "JWT_EXPIRES_IN": "24h"
   },
   "delay": "1000",
   "restartable": "rs",

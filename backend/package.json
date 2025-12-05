@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts",
+    "dev": "JWT_EXPIRES_IN=24h nodemon src/index.ts",
     "vercel-build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

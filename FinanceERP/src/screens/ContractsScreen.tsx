@@ -352,7 +352,10 @@ useEffect(() => {
         // Update existing contract
         const response = await ApiService.updateContract(editingContract.id, contractData);
         if (response.success && response.data) {
-          setContracts(contracts.map(c => c.id === editingContract.id ? response.data : c));
+          // Atualizar ambos os estados: contracts e filteredContracts
+          const updatedContracts = contracts.map(c => c.id === editingContract.id ? response.data : c);
+          setContracts(updatedContracts);
+          setFilteredContracts(filteredContracts.map(c => c.id === editingContract.id ? response.data : c));
           Alert.alert('Sucesso', 'Contrato actualizado com sucesso');
         } else {
           Alert.alert('Erro', 'Não foi possível actualizar o contrato');
