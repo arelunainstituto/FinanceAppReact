@@ -67,14 +67,32 @@ class AIAnalystService {
         historyLength: history.length
       });
 
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.createBasicAuthHeader(credentials.username, credentials.password)
-        },
-        body: JSON.stringify(requestData)
-      });
+      // Create AbortController for timeout (120 seconds in production, 30 seconds otherwise)
+      const timeoutMs = process.env.NODE_ENV === 'production' ? 120000 : 30000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      let response;
+      try {
+        response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.createBasicAuthHeader(credentials.username, credentials.password)
+          },
+          body: JSON.stringify(requestData),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('🤖 Timeout ao comunicar com N8N após', timeoutMs / 1000, 'segundos');
+          throw new Error(`Timeout: O servidor N8N não respondeu em ${timeoutMs / 1000} segundos`);
+        }
+        throw fetchError;
+      }
 
       console.log('🤖 Resposta do N8N:', {
         status: response.status,
