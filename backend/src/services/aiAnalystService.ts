@@ -1,4 +1,5 @@
-import fetch from 'node-fetch';
+// Using native Node.js fetch (available in Node.js 18+)
+// No import needed - fetch is globally available
 
 interface ChatMessage {
   role: 'user' | 'assistant';
