@@ -11,6 +11,7 @@ import clientRoutes from '../backend/src/routes/clientRoutes';
 import contractRoutes from '../backend/src/routes/contractRoutes';
 import paymentRoutes from '../backend/src/routes/paymentRoutes';
 import dashboardRoutes from '../backend/src/routes/dashboardRoutes';
+import aiAnalystRoutes from '../backend/src/routes/aiAnalystRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -68,6 +69,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai-analyst', aiAnalystRoutes);
 
 // Health check route
 app.get('/api/health', (_req, res) => {
@@ -92,7 +94,9 @@ app.get('/', (_req, res) => {
       '/api/clients',
       '/api/contracts',
       '/api/payments',
-      '/api/dashboard/stats'
+      '/api/dashboard/stats',
+      '/api/ai-analyst/chat',
+      '/api/ai-analyst/test'
     ]
   });
 });
