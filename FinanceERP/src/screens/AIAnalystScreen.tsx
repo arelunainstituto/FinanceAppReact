@@ -486,7 +486,7 @@ const AIAnalystScreen: React.FC = () => {
         >
           {messages.map((message, index) => renderMessage(message, index))}
 
-          {isLoading && (
+          {(isLoading || pendingRequests.size > 0) && (
             <View style={styles.loadingContainer}>
               <View style={styles.loadingBubble}>
                 <ActivityIndicator size="small" color="#007AFF" />
@@ -530,16 +530,20 @@ const AIAnalystScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                !inputText.trim() && styles.sendButtonDisabled
+                (!inputText.trim() || pendingRequests.size > 0) && styles.sendButtonDisabled
               ]}
               onPress={handleSendMessage}
-              disabled={!isFeatureEnabled || !inputText.trim()}
+              disabled={!isFeatureEnabled || !inputText.trim() || pendingRequests.size > 0}
             >
-              <Ionicons
-                name="send"
-                size={20}
-                color={(!isFeatureEnabled || !inputText.trim()) ? '#8E8E93' : '#FFFFFF'}
-              />
+              {pendingRequests.size > 0 ? (
+                <ActivityIndicator size="small" color="#8E8E93" />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={(!isFeatureEnabled || !inputText.trim()) ? '#8E8E93' : '#FFFFFF'}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
