@@ -38,8 +38,8 @@ class AIAnalystService {
   }
 
   async sendMessage(
-    message: string, 
-    userName: string, 
+    message: string,
+    userName: string,
     userEmail: string,
     history: ChatMessage[] = []
   ): Promise<N8NResponse> {
@@ -88,7 +88,7 @@ class AIAnalystService {
 
       let result: any = null;
       const rawResponseText = await response.text();
-      
+
       if (rawResponseText && rawResponseText.trim()) {
         try {
           result = JSON.parse(rawResponseText);
@@ -100,15 +100,20 @@ class AIAnalystService {
         console.log('🤖 Resposta vazia do N8N');
         result = null;
       }
-      console.log('🤖 Resultado processado:', result);
-      console.log('🤖 Tipo do resultado:', typeof result);
-      console.log('🤖 Chaves do resultado:', Object.keys(result || {}));
+      console.log('🤖 Resultado processado:', JSON.stringify(result, null, 2));
 
       // Extrair a mensagem do formato do N8N
       let responseText: string = 'Resposta recebida';
-      
+
+      // Normalizar result para lidar com Arrays do N8N
+      let dataToProcess = result;
+      if (Array.isArray(result) && result.length > 0) {
+        console.log('🤖 Resultado é um array, usando o primeiro item');
+        dataToProcess = result[0];
+      }
+
       // Verificar se o resultado está vazio ou inválido
-      if (!result || (typeof result === 'object' && Object.keys(result).length === 0)) {
+      if (!dataToProcess || (typeof dataToProcess === 'object' && Object.keys(dataToProcess).length === 0)) {
         console.log('🤖 Resultado vazio do N8N, usando resposta simulada');
         // Resposta simulada enquanto o N8N não está funcionando
         const responses = [
@@ -119,33 +124,45 @@ class AIAnalystService {
           `Perfeito! Vou analisar as informações e gerar um relatório personalizado para você.`
         ];
         responseText = responses[Math.floor(Math.random() * responses.length)];
-      } else if (result.message && typeof result.message === 'object') {
+      }
+      // Verificações diretas no objeto (ou primeiro item do array)
+      else if (dataToProcess.output && typeof dataToProcess.output === 'string') {
+        responseText = dataToProcess.output;
+        console.log('🤖 Resposta extraída de .output:', responseText);
+      } else if (dataToProcess.message && typeof dataToProcess.message === 'object') {
         // Formato: { role: 'assistant', content: 'texto', ... }
-        responseText = result.message.content || result.message.message || 'Resposta recebida';
-        console.log('🤖 Resposta extraída de result.message:', responseText);
-      } else if (result.message && typeof result.message === 'string') {
-        // Formato: string simples
-        responseText = result.message;
-        console.log('🤖 Resposta extraída de result.message (string):', responseText);
-      } else if (result.response) {
-        // Formato: { response: 'texto' }
-        responseText = result.response;
-        console.log('🤖 Resposta extraída de result.response:', responseText);
-      } else if (result.content) {
-        // Formato: { content: 'texto' }
-        responseText = result.content;
-        console.log('🤖 Resposta extraída de result.content:', responseText);
-      } else if (result.output) {
-        // Formato: { output: 'texto' }
-        responseText = result.output;
-        console.log('🤖 Resposta extraída de result.output:', responseText);
-      } else if (typeof result === 'object' && result !== null) {
-        // Buscar em qualquer propriedade que contenha texto
+        responseText = dataToProcess.message.content || dataToProcess.message.message || 'Resposta recebida';
+        console.log('🤖 Resposta extraída de .message:', responseText);
+      } else if (dataToProcess.message && typeof dataToProcess.message === 'string') {
+        responseText = dataToProcess.message;
+        console.log('🤖 Resposta extraída de .message (string):', responseText);
+      } else if (dataToProcess.response && typeof dataToProcess.response === 'string') {
+        responseText = dataToProcess.response;
+        console.log('🤖 Resposta extraída de .response:', responseText);
+      } else if (dataToProcess.content && typeof dataToProcess.content === 'string') {
+        responseText = dataToProcess.content;
+        console.log('🤖 Resposta extraída de .content:', responseText);
+      } else if (dataToProcess.text && typeof dataToProcess.text === 'string') {
+        responseText = dataToProcess.text;
+        console.log('🤖 Resposta extraída de .text:', responseText);
+      } else if (dataToProcess.answer && typeof dataToProcess.answer === 'string') {
+        responseText = dataToProcess.answer;
+        console.log('🤖 Resposta extraída de .answer:', responseText);
+      } else {
+        // Busca recursiva como fallback
+        console.log('🤖 Tentando busca recursiva em:', dataToProcess);
+
         const searchForText = (obj: any): string | null => {
-          if (typeof obj === 'string' && obj.length > 10) {
+          if (typeof obj === 'string' && obj.length > 5) { // Reduzido para 5 chars
             return obj;
           }
           if (typeof obj === 'object' && obj !== null) {
+            // Priorizar chaves comuns
+            const priorityKeys = ['output', 'message', 'response', 'content', 'text', 'answer', 'html', 'markdown'];
+            for (const key of priorityKeys) {
+              if (obj[key] && typeof obj[key] === 'string') return obj[key];
+            }
+
             for (const key in obj) {
               const found = searchForText(obj[key]);
               if (found) return found;
@@ -153,14 +170,14 @@ class AIAnalystService {
           }
           return null;
         };
-        
-        const foundText = searchForText(result);
+
+        const foundText = searchForText(dataToProcess);
         if (foundText) {
           responseText = foundText;
           console.log('🤖 Resposta encontrada via busca recursiva:', responseText);
         } else {
-          console.log('🤖 Nenhuma resposta encontrada no objeto, usando padrão');
-          responseText = 'Desculpe, não foi possível processar a resposta do assistente.';
+          console.log('🤖 Nenhuma resposta encontrada no objeto (Dump):', JSON.stringify(dataToProcess));
+          responseText = 'Desculpe, não foi possível processar a resposta do assistente. Verifique o formato de retorno do N8N.';
         }
       }
 
@@ -171,7 +188,7 @@ class AIAnalystService {
 
     } catch (error) {
       console.error('🤖 Erro ao comunicar com N8N:', error);
-      
+
       return {
         response: 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.',
         success: false,
@@ -205,7 +222,7 @@ class AIAnalystService {
 
       const isOk = response.ok;
       console.log('🤖 Teste de conexão N8N:', isOk ? 'SUCESSO' : 'FALHA');
-      
+
       return isOk;
     } catch (error) {
       console.error('🤖 Erro ao testar conexão N8N:', error);
