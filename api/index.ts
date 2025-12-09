@@ -16,6 +16,7 @@ import aiAnalystRoutes from '../backend/src/routes/aiAnalystRoutes';
 // Load environment variables
 dotenv.config();
 
+
 const app = express();
 
 // Security middleware
@@ -35,17 +36,17 @@ const corsOptions = {
     if (!origin) {
       return callback(null, true);
     }
-    
+
     // Allow if in the list
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     // Allow any Vercel preview URL from our project
     if (origin.match(/^https:\/\/financeapp-(areluna|lime).*\.vercel\.app$/)) {
       return callback(null, true);
     }
-    
+
     // Reject others
     callback(new Error('Not allowed by CORS'));
   },
