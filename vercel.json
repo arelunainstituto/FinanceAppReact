@@ -31,7 +31,19 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 150,
-      "memory": 1024
+      "memory": 1024,
+      "regions": ["cdg1"]
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
+  ]
 }
