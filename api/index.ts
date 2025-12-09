@@ -81,6 +81,15 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Warming endpoint to prevent cold starts
+// Call this endpoint every 5-10 minutes to keep the function warm
+app.get('/api/warm', (_req, res) => {
+  res.status(200).json({
+    status: 'warm',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Root route
 app.get('/', (_req, res) => {
   res.json({
