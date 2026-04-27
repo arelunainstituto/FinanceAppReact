@@ -1,6 +1,7 @@
 import { ClientRepository } from '../repositories/clientRepository';
 import { Client } from '../models';
 import { createError } from '../middlewares/errorHandler';
+import { stripeService } from './stripeService';
 
 export class ClientService {
   private clientRepository: ClientRepository;
@@ -71,7 +72,23 @@ export class ClientService {
       }
     }
 
-    return this.clientRepository.create(clientData);
+    const createdClient = await this.clientRepository.create(clientData);
+
+    if (stripeService.isEnabled() && !createdClient.external_id) {
+      try {
+        const stripeCustomerId = await stripeService.createCustomer(createdClient);
+        if (stripeCustomerId) {
+          const updated = await this.clientRepository.update(createdClient.id, { external_id: stripeCustomerId });
+          return updated || createdClient;
+        }
+      } catch (error) {
+        console.error(`Stripe customer creation failed for client ${createdClient.id}, rolling back:`, error);
+        await this.clientRepository.delete(createdClient.id);
+        throw createError('Failed to create client in Stripe', 502);
+      }
+    }
+
+    return createdClient;
   }
 
   async updateClient(id: string, clientData: Partial<Omit<Client, 'id' | 'created_at' | 'updated_at'>>): Promise<Client> {

@@ -1,9 +1,10 @@
 import { ContractRepository, PaginationOptions, ContractFilters, PaginatedResult } from '../repositories/contractRepository';
 import { ClientRepository } from '../repositories/clientRepository';
 import { PaymentRepository } from '../repositories/paymentRepository';
-import { Contract, Payment } from '../models';
+import { Contract, Payment, Client } from '../models';
 import { createError } from '../middlewares/errorHandler';
 import { divideIntoInstallments, subtractMoneyValues } from '../utils/moneyUtils';
+import { stripeService } from './stripeService';
 
 export class ContractService {
   private contractRepository: ContractRepository;
@@ -135,9 +136,94 @@ export class ContractService {
     // Generate automatic payments if required fields are present
     if (createdContract.start_date && createdContract.number_of_payments && createdContract.number_of_payments > 0) {
       await this.generateAutomaticPayments(createdContract, paymentMethod);
+
+      if (stripeService.isEnabled()) {
+        await this.syncContractToStripe(createdContract, client);
+      }
     }
 
     return createdContract;
+  }
+
+  /**
+   * Sincroniza o contrato com o Stripe: garante Customer, cria Subscription Schedule
+   * e (se houver) Invoice avulsa para a entrada. Em caso de falha, faz rollback total
+   * (cancela schedule/invoice no Stripe, apaga parcelas e contrato no banco).
+   */
+  private async syncContractToStripe(contract: Contract, client: Client): Promise<void> {
+    let createdScheduleId: string | null = null;
+    let createdInvoiceId: string | null = null;
+    let stripeCustomerId = client.external_id || null;
+    let createdNewCustomer = false;
+
+    try {
+      if (!stripeCustomerId) {
+        stripeCustomerId = await stripeService.createCustomer(client);
+        if (stripeCustomerId) {
+          createdNewCustomer = true;
+          await this.clientRepository.update(client.id, { external_id: stripeCustomerId });
+        }
+      }
+
+      if (!stripeCustomerId) {
+        throw new Error('Stripe customer id is unavailable');
+      }
+
+      const totalValue = Number(contract.value);
+      const downPaymentValue = Number(contract.down_payment) || 0;
+      const numberOfPayments = Number(contract.number_of_payments);
+      const remainingValue = subtractMoneyValues(totalValue, downPaymentValue);
+      const installmentValues = divideIntoInstallments(remainingValue, numberOfPayments);
+      const installmentAmount = installmentValues[0];
+
+      const startDate = new Date(contract.start_date as any);
+      const firstInstallmentDate = new Date(startDate);
+      firstInstallmentDate.setMonth(startDate.getMonth() + 1);
+
+      createdScheduleId = await stripeService.createSubscriptionSchedule({
+        stripeCustomerId,
+        installmentAmount,
+        numberOfPayments,
+        firstInstallmentDate,
+        contractId: contract.id,
+        contractDescription: `Contrato ${contract.contract_number ?? contract.id}`,
+      });
+
+      if (downPaymentValue > 0) {
+        createdInvoiceId = await stripeService.createDownPaymentInvoice({
+          stripeCustomerId,
+          amount: downPaymentValue,
+          contractId: contract.id,
+          description: `Entrada - Contrato ${contract.contract_number ?? contract.id}`,
+        });
+      }
+
+      if (createdScheduleId) {
+        await this.contractRepository.update(contract.id, { stripe_schedule_id: createdScheduleId });
+      }
+    } catch (error) {
+      console.error(`Stripe sync failed for contract ${contract.id}, rolling back:`, error);
+
+      if (createdInvoiceId) {
+        await stripeService.voidInvoice(createdInvoiceId);
+      }
+      if (createdScheduleId) {
+        await stripeService.cancelSchedule(createdScheduleId);
+      }
+      if (createdNewCustomer && stripeCustomerId) {
+        await stripeService.deleteCustomer(stripeCustomerId);
+        await this.clientRepository.update(client.id, { external_id: undefined });
+      }
+
+      try {
+        await this.paymentRepository.deleteByContractId(contract.id);
+        await this.contractRepository.delete(contract.id);
+      } catch (rollbackError) {
+        console.error(`Rollback in DB failed for contract ${contract.id}:`, rollbackError);
+      }
+
+      throw createError('Failed to sync contract with Stripe', 502);
+    }
   }
 
   async updateContract(id: string, contractData: Partial<Omit<Contract, 'id' | 'created_at' | 'updated_at'>>): Promise<Contract> {

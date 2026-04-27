@@ -48,6 +48,7 @@ export interface Contract {
   area?: string;
   gestora?: string;
   medico?: string;
+  stripe_schedule_id?: string;
   created_at: Date;
   updated_at: Date;
 }
