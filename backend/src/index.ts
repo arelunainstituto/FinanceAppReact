@@ -1,14 +1,15 @@
+import dotenv from 'dotenv';
+
+// Load environment variables FIRST - before importing routes/services
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import routes from './routes';
 import { logger } from './middlewares/logger';
 import { errorHandler, notFound } from './middlewares/errorHandler';
 import { SchedulerService } from './services/schedulerService';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3030;

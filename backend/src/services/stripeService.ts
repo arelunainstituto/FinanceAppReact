@@ -5,6 +5,11 @@ const STRIPE_ENABLED = process.env.STRIPE_ENABLED === 'true';
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_CURRENCY = 'eur';
 
+console.log('🔵 StripeService - Initialization:');
+console.log('  STRIPE_ENABLED env var:', process.env.STRIPE_ENABLED);
+console.log('  STRIPE_ENABLED === "true":', STRIPE_ENABLED);
+console.log('  STRIPE_SECRET_KEY present:', !!STRIPE_SECRET_KEY);
+
 export interface CreateScheduleParams {
   stripeCustomerId: string;
   installmentAmount: number;

@@ -137,8 +137,15 @@ export class ContractService {
     if (createdContract.start_date && createdContract.number_of_payments && createdContract.number_of_payments > 0) {
       await this.generateAutomaticPayments(createdContract, paymentMethod);
 
+      console.log('✅ Stripe service enabled:', stripeService.isEnabled());
       if (stripeService.isEnabled()) {
+        console.log('🔵 Starting Stripe sync for contract:', createdContract.id);
         await this.syncContractToStripe(createdContract, client);
+        // Refetch contract to get updated stripe_schedule_id
+        const updatedContract = await this.contractRepository.findById(createdContract.id);
+        if (updatedContract) {
+          return updatedContract;
+        }
       }
     }
 
@@ -151,12 +158,14 @@ export class ContractService {
    * (cancela schedule/invoice no Stripe, apaga parcelas e contrato no banco).
    */
   private async syncContractToStripe(contract: Contract, client: Client): Promise<void> {
+    console.log('🔄 syncContractToStripe called for contract:', contract.id);
     let createdScheduleId: string | null = null;
     let createdInvoiceId: string | null = null;
     let stripeCustomerId = client.external_id || null;
     let createdNewCustomer = false;
 
     try {
+      console.log('  - Client stripe ID:', stripeCustomerId);
       if (!stripeCustomerId) {
         stripeCustomerId = await stripeService.createCustomer(client);
         if (stripeCustomerId) {
@@ -180,6 +189,7 @@ export class ContractService {
       const firstInstallmentDate = new Date(startDate);
       firstInstallmentDate.setMonth(startDate.getMonth() + 1);
 
+      console.log('  - Creating subscription schedule...');
       createdScheduleId = await stripeService.createSubscriptionSchedule({
         stripeCustomerId,
         installmentAmount,
@@ -188,6 +198,7 @@ export class ContractService {
         contractId: contract.id,
         contractDescription: `Contrato ${contract.contract_number ?? contract.id}`,
       });
+      console.log('  - Schedule created:', createdScheduleId);
 
       if (downPaymentValue > 0) {
         createdInvoiceId = await stripeService.createDownPaymentInvoice({
@@ -199,7 +210,9 @@ export class ContractService {
       }
 
       if (createdScheduleId) {
+        console.log('  - Saving schedule ID to database:', createdScheduleId);
         await this.contractRepository.update(contract.id, { stripe_schedule_id: createdScheduleId });
+        console.log('  ✅ Schedule ID saved to database');
       }
     } catch (error) {
       console.error(`Stripe sync failed for contract ${contract.id}, rolling back:`, error);
