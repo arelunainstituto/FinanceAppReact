@@ -25,9 +25,9 @@ build/
 .env.test
 .env.test.local
 
-# Keep production env files for deployment
-!.env.production
-!.env.vercel.production
+# Production env files (NEVER commit real secrets — configure via Vercel dashboard)
+.env.production
+.env.vercel.production
 
 # OS
 .DS_Store

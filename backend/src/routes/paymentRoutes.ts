@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { PaymentController } from '../controllers/paymentController';
 import { authenticateToken } from '../middlewares/auth';
+import { validate } from '../middlewares/validate';
+import { createPaymentSchema, updatePaymentSchema, manualPaymentSchema, confirmImportSchema } from '../schemas/paymentSchema';
 import multer from 'multer';
 
 const router = Router();
@@ -17,10 +19,9 @@ const upload = multer({
     const allowedMimeTypes = [
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/octet-stream'
     ];
     
-    if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls')) {
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Apenas arquivos Excel (.xlsx, .xls) são permitidos'));
@@ -34,7 +35,7 @@ router.use(authenticateToken);
 // Specific routes first (to avoid conflicts with /:id)
 router.post('/import', upload.single('file'), paymentController.importPaymentsFromExcel);
 router.post('/import/preview', upload.single('file'), paymentController.previewImportFromExcel);
-router.post('/import/confirm', paymentController.confirmImport);
+router.post('/import/confirm', validate(confirmImportSchema), paymentController.confirmImport);
 router.get('/paginated', paymentController.getAllPaymentsPaginated);
 router.get('/recent', paymentController.getRecentPayments);
 router.get('/upcoming', paymentController.getUpcomingPayments);
@@ -49,10 +50,10 @@ router.get('/', paymentController.getAllPaymentsPaginated);
 router.get('/all', paymentController.getAllPayments);
 router.get('/export', paymentController.getAllPaymentsForExport);
 router.get('/:id', paymentController.getPaymentById);
-router.post('/', paymentController.createPayment);
-router.put('/:id', paymentController.updatePayment);
+router.post('/', validate(createPaymentSchema), paymentController.createPayment);
+router.put('/:id', validate(updatePaymentSchema), paymentController.updatePayment);
 router.delete('/:id', paymentController.deletePayment);
 router.patch('/:id/mark-paid', paymentController.markPaymentAsPaid);
-router.post('/:id/manual-payment', paymentController.processManualPayment);
+router.post('/:id/manual-payment', validate(manualPaymentSchema), paymentController.processManualPayment);
 
 export default router;

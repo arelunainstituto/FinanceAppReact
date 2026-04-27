@@ -15,23 +15,13 @@ export class AuthService {
     const { email, password } = loginData;
 
     try {
-      console.log('=== LOGIN ATTEMPT ===');
-      console.log('Email:', email);
-      console.log('Password length:', password.length);
-      console.log('Supabase URL:', process.env.SUPABASE_URL);
-      console.log('Has Service Role Key:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-      
       // Use Supabase Auth to sign in
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      console.log('Auth data:', JSON.stringify(authData, null, 2));
-      console.log('Auth error:', JSON.stringify(authError, null, 2));
-
       if (authError || !authData.user) {
-        console.log('Authentication failed - throwing error');
         throw createError('Invalid credentials', 401);
       }
 
@@ -53,7 +43,7 @@ export class AuthService {
         token
       };
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Login failed for email:', email);
       if (error.status) throw error; // Re-throw if it's already a formatted error
       throw createError('Invalid credentials', 401);
     }
@@ -69,8 +59,14 @@ export class AuthService {
     }
 
     // Validate password strength
-    if (password.length < 6) {
-      throw createError('Password must be at least 6 characters long', 400);
+    if (password.length < 10) {
+      throw createError('Password must be at least 10 characters long', 400);
+    }
+    if (!/[A-Z]/.test(password)) {
+      throw createError('Password must contain at least one uppercase letter', 400);
+    }
+    if (!/[0-9]/.test(password)) {
+      throw createError('Password must contain at least one number', 400);
     }
 
     // Create user
@@ -105,53 +101,42 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
-      console.log('=== FORGOT PASSWORD ATTEMPT ===');
-      console.log('Email:', email);
-      
       // Use Supabase Auth to send password reset email
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: 'https://financeapp-areluna.vercel.app/reset-password', // Production frontend URL for password reset
       });
 
       if (error) {
-        console.log('Password reset error:', error);
+        console.error('Password reset email failed');
         throw createError('Erro ao enviar email de recuperação', 400);
       }
 
-      console.log('Password reset email sent successfully');
-      
       return {
         message: 'Email de recuperação enviado com sucesso'
       };
     } catch (error) {
-      console.error('Forgot password error:', error);
+      console.error('Forgot password error');
       throw error;
     }
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(_token: string, newPassword: string): Promise<{ message: string }> {
     try {
-      console.log('=== RESET PASSWORD ATTEMPT ===');
-      console.log('Token length:', token.length);
-      console.log('New password length:', newPassword.length);
-      
       // Use Supabase Auth to update password with token
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) {
-        console.log('Password reset error:', error);
+        console.error('Password reset failed');
         throw createError('Token inválido ou expirado', 400);
       }
 
-      console.log('Password reset successful');
-      
       return {
         message: 'Senha alterada com sucesso'
       };
     } catch (error) {
-      console.error('Reset password error:', error);
+      console.error('Reset password error');
       throw error;
     }
   }
@@ -175,7 +160,7 @@ export class AuthService {
 
       return { valid: true, user: userWithoutPassword };
     } catch (error) {
-      console.error('Token verification error:', error);
+      console.error('Token verification error');
       return { valid: false, user: null };
     }
   }

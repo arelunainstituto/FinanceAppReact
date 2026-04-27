@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { ContractController } from '../controllers/contractController';
 import { authenticateToken } from '../middlewares/auth';
+import { validate } from '../middlewares/validate';
+import { createContractSchema, updateContractSchema } from '../schemas/contractSchema';
 
 const router = Router();
 const contractController = new ContractController();
@@ -14,8 +16,8 @@ router.get('/', contractController.getAllContracts);
 router.get('/:id', contractController.getContractById);
 router.get('/:id/details', contractController.getContractDetails);
 router.get('/:id/balances', contractController.getContractBalances);
-router.post('/', contractController.createContract);
-router.put('/:id', contractController.updateContract);
+router.post('/', validate(createContractSchema), contractController.createContract);
+router.put('/:id', validate(updateContractSchema), contractController.updateContract);
 router.delete('/:id', contractController.deleteContract);
 
 // Bulk operations

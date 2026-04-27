@@ -26,24 +26,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (parsedUserData && parsedUserData.id && parsedUserData.email) {
           try {
             // Verify token with backend
-            console.log('🔐 Verifying token with backend...');
             const response = await ApiService.verifyToken();
 
             if (response.data?.valid && response.data?.user) {
-              console.log('✅ Token is valid, user authenticated');
               setUser(parsedUserData);
             } else {
-              console.log('❌ Token verification failed, clearing auth data');
               await AsyncStorage.removeItem('auth_token');
               await AsyncStorage.removeItem('user_data');
               setUser(null);
             }
           } catch (verifyError: any) {
-            console.error('❌ Token verification error:', verifyError);
             // If it's an auth error (401/403), the ApiService already cleared storage
             // Just need to clear user state
             if (verifyError.isAuthError) {
-              console.log('🚨 Auth error detected in verification, logging out user');
               setUser(null);
             } else {
               // Clear potentially invalid data
@@ -63,7 +58,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       }
     } catch (error) {
-      console.error('❌ Error checking auth state:', error);
+      console.error('Error checking auth state');
       // Clear potentially corrupted data
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
@@ -79,7 +74,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Subscribe to auth error events for immediate logout
     const unsubscribe = authErrorEvent.subscribe(() => {
-      console.log('🚨 Auth error event received - logging out immediately');
       setUser(null);
     });
 
@@ -88,7 +82,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (user) {
         const token = await AsyncStorage.getItem('auth_token');
         if (!token) {
-          console.log('🚨 Token removed, logging out user');
           setUser(null);
         }
       }
@@ -105,30 +98,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const response = await ApiService.login(email, password);
       
-      console.log('🔐 Login response:', response);
-      
       // Verificar se a resposta contém dados válidos
       if (response.data && response.data.user && response.data.token) {
         const { user: userData, token } = response.data;
         
-        console.log('🔐 Storing token:', token.substring(0, 50) + '...');
-        console.log('🔐 Storing user data:', userData);
-        
         await AsyncStorage.setItem('auth_token', token);
         await AsyncStorage.setItem('user_data', JSON.stringify(userData));
-        
-        // Verify storage
-        const storedToken = await AsyncStorage.getItem('auth_token');
-        const storedUserData = await AsyncStorage.getItem('user_data');
-        console.log('🔐 Verification - Token stored:', !!storedToken);
-        console.log('🔐 Verification - User data stored:', !!storedUserData);
         
         setUser(userData);
       } else {
         throw new Error('Login failed: Invalid response format');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error');
       throw error;
     } finally {
       setIsLoading(false);
@@ -137,18 +119,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      console.log('🚪 Logging out user');
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
       setUser(null);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout error');
     }
   }, []);
 
   // Handle authentication errors from API calls
   const handleAuthError = useCallback(async () => {
-    console.log('🚨 Handling authentication error - forcing logout');
     await logout();
   }, [logout]);
 

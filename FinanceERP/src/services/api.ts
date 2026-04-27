@@ -6,7 +6,6 @@ import { authErrorEvent } from '../utils/authEvents';
 const getApiBaseUrl = () => {
   // PRIORITY 1: Use environment variable if available (for all environments)
   if (process.env.REACT_APP_API_BASE_URL) {
-    console.log('🌐 Using API URL from environment:', process.env.REACT_APP_API_BASE_URL);
     return process.env.REACT_APP_API_BASE_URL.replace(/\/$/, '');
   }
   
@@ -16,26 +15,21 @@ const getApiBaseUrl = () => {
     
     // Development: localhost
     if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-      console.log('🌐 Using localhost API URL: http://localhost:3030/api');
       return 'http://localhost:3030/api';
     }
     
     // Production: Use same domain as frontend ONLY for main production domain
-    // This allows Vercel preview branches to work correctly with environment variables
     if (currentUrl.includes('financeiro.institutoareluna.pt')) {
-      console.log('🌐 Using production API URL:', `${currentUrl}/api`);
       return `${currentUrl}/api`;
     }
     
     // Vercel preview/production (financeapp-*.vercel.app): Use same domain
     if (currentUrl.includes('vercel.app')) {
-      console.log('🌐 Using Vercel deployment API URL:', `${currentUrl}/api`);
       return `${currentUrl}/api`;
     }
   }
   
   // PRIORITY 3: Fallback for server-side rendering or React Native
-  console.log('🌐 Using fallback API URL: https://financeiro.institutoareluna.pt/api');
   return 'https://financeiro.institutoareluna.pt/api';
 };
 
@@ -44,11 +38,6 @@ const API_BASE_URL = getApiBaseUrl();
 class ApiService {
   private async getAuthHeaders(): Promise<Record<string, string>> {
     const token = await AsyncStorage.getItem('auth_token');
-    console.log('🔑 Token retrieved from storage:', token ? 'Token exists' : 'No token found');
-    console.log('🔑 Token length:', token?.length || 0);
-    if (token) {
-      console.log('🔑 Token preview:', token.substring(0, 50) + '...');
-    }
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -61,9 +50,6 @@ class ApiService {
   ): Promise<ApiResponse<T>> {
     const headers = await this.getAuthHeaders();
 
-    console.log('🌐 Making request to:', `${API_BASE_URL}${endpoint}`);
-    console.log('🌐 Request headers:', headers);
-
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
@@ -72,23 +58,16 @@ class ApiService {
       },
     });
 
-    console.log('🌐 Response status:', response.status);
-    console.log('🌐 Response ok:', response.ok);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('🌐 Error response:', errorText);
 
       // Handle authentication errors (token expired or invalid)
       if (response.status === 401 || response.status === 403) {
-        console.log('🚨 Authentication error detected - clearing session');
-
         // Clear authentication data
         await AsyncStorage.removeItem('auth_token');
         await AsyncStorage.removeItem('user_data');
 
         // Emit auth error event to force immediate logout
-        console.log('📢 Emitting auth error event');
         authErrorEvent.emit();
 
         // Throw specific error for authentication failure
@@ -102,7 +81,6 @@ class ApiService {
     }
 
     const result = await response.json();
-    console.log('🌐 Response data:', result);
     return result;
   }
 
@@ -188,9 +166,6 @@ class ApiService {
       }
     }
     
-    console.log('🌐 URL da requisição:', endpoint);
-    console.log('📋 Filtros processados:', filters);
-    
     return this.request(endpoint);
   }
 
@@ -259,7 +234,6 @@ class ApiService {
       });
     }
     
-    console.log('🌐 Final API URL:', url);
     return this.request(url);
   }
 
@@ -325,17 +299,11 @@ class ApiService {
   }
 
   async updatePayment(id: string, payment: Partial<Payment>): Promise<ApiResponse<Payment>> {
-    console.log('🔍 [ApiService] updatePayment called:', {
-      paymentId: id,
-      paymentData: payment
-    });
-
     const response = await this.request(`/payments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payment),
     });
 
-    console.log('🔍 [ApiService] updatePayment response:', response);
     return response;
   }
 
@@ -387,7 +355,6 @@ class ApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('🌐 Error response:', errorText);
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
@@ -442,7 +409,6 @@ class ApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.log('🌐 Error response:', errorText);
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
