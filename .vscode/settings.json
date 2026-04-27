@@ -1,3 +1,5 @@
 {
-    "claudeCode.allowDangerouslySkipPermissions": true
+    "claudeCode.allowDangerouslySkipPermissions": true,
+    "snyk.advanced.organization": "f9ba227d-152e-48fb-922a-2bb89d455482",
+    "snyk.advanced.autoSelectOrganization": true
 }
