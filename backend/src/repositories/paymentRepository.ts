@@ -1216,4 +1216,60 @@ export class PaymentRepository {
       throw new Error('Failed to delete payments by contract ID');
     }
   }
+
+  async findByExternalId(externalId: string): Promise<Payment | null> {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('external_id', externalId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || null;
+    } catch (error) {
+      console.error('Error fetching payment by external ID:', error);
+      return null;
+    }
+  }
+
+  async findFirstPendingByContract(contractId: string, paymentType?: string): Promise<Payment | null> {
+    try {
+      let query = supabase
+        .from('payments')
+        .select('*')
+        .eq('contract_id', contractId)
+        .neq('status', 'paid')
+        .order('due_date', { ascending: true })
+        .limit(1);
+
+      if (paymentType) {
+        query = query.eq('payment_type', paymentType);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || null;
+    } catch (error) {
+      console.error('Error fetching first pending payment:', error);
+      return null;
+    }
+  }
+
+  async markAsFailed(id: string): Promise<Payment | null> {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .update({ status: 'failed' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data || null;
+    } catch (error) {
+      console.error('Error marking payment as failed:', error);
+      return null;
+    }
+  }
 }

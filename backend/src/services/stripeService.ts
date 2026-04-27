@@ -3,12 +3,8 @@ import { Client } from '../models';
 
 const STRIPE_ENABLED = process.env.STRIPE_ENABLED === 'true';
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_CURRENCY = 'eur';
-
-console.log('🔵 StripeService - Initialization:');
-console.log('  STRIPE_ENABLED env var:', process.env.STRIPE_ENABLED);
-console.log('  STRIPE_ENABLED === "true":', STRIPE_ENABLED);
-console.log('  STRIPE_SECRET_KEY present:', !!STRIPE_SECRET_KEY);
 
 export interface CreateScheduleParams {
   stripeCustomerId: string;
@@ -17,6 +13,7 @@ export interface CreateScheduleParams {
   firstInstallmentDate: Date;
   contractId: string;
   contractDescription: string;
+  paymentMethodId?: string;
 }
 
 export interface CreateDownPaymentInvoiceParams {
@@ -24,10 +21,16 @@ export interface CreateDownPaymentInvoiceParams {
   amount: number;
   contractId: string;
   description: string;
+  paymentMethodId?: string;
+}
+
+export interface SetupIntentResult {
+  clientSecret: string;
+  customerId: string;
 }
 
 export class StripeService {
-  private stripe: Stripe | null;
+  private readonly stripe: Stripe | null;
 
   constructor() {
     if (STRIPE_ENABLED && STRIPE_SECRET_KEY) {
@@ -66,6 +69,39 @@ export class StripeService {
     return customer.id;
   }
 
+  /**
+   * Cria um SetupIntent para que o frontend possa capturar dados de cartão
+   * usando o Stripe Embedded Payment Element. Retorna client_secret para o
+   * frontend e o stripe_customer_id (cria customer se ainda não existir).
+   */
+  async createSetupIntent(client: Client): Promise<SetupIntentResult | null> {
+    if (!this.stripe) return null;
+
+    let stripeCustomerId = client.external_id;
+    if (!stripeCustomerId) {
+      stripeCustomerId = await this.createCustomer(client) ?? undefined;
+      if (!stripeCustomerId) {
+        throw new Error('Failed to create Stripe customer for SetupIntent');
+      }
+    }
+
+    const setupIntent = await this.stripe.setupIntents.create({
+      customer: stripeCustomerId,
+      payment_method_types: ['card', 'sepa_debit'],
+      usage: 'off_session',
+      metadata: { internal_client_id: client.id },
+    });
+
+    if (!setupIntent.client_secret) {
+      throw new Error('Stripe returned SetupIntent without client_secret');
+    }
+
+    return {
+      clientSecret: setupIntent.client_secret,
+      customerId: stripeCustomerId,
+    };
+  }
+
   async createSubscriptionSchedule(params: CreateScheduleParams): Promise<string | null> {
     if (!this.stripe) return null;
 
@@ -77,7 +113,7 @@ export class StripeService {
       metadata: { internal_contract_id: params.contractId },
     });
 
-    const schedule = await this.stripe.subscriptionSchedules.create({
+    const scheduleParams: Stripe.SubscriptionScheduleCreateParams = {
       customer: params.stripeCustomerId,
       start_date: Math.floor(params.firstInstallmentDate.getTime() / 1000),
       end_behavior: 'cancel',
@@ -86,8 +122,16 @@ export class StripeService {
         iterations: params.numberOfPayments,
       }],
       metadata: { internal_contract_id: params.contractId },
-    });
+    };
 
+    if (params.paymentMethodId) {
+      scheduleParams.default_settings = {
+        default_payment_method: params.paymentMethodId,
+        collection_method: 'charge_automatically',
+      };
+    }
+
+    const schedule = await this.stripe.subscriptionSchedules.create(scheduleParams);
     return schedule.id;
   }
 
@@ -102,17 +146,30 @@ export class StripeService {
       metadata: { internal_contract_id: params.contractId, payment_type: 'downPayment' },
     });
 
-    const invoice = await this.stripe.invoices.create({
+    const invoiceParams: Stripe.InvoiceCreateParams = {
       customer: params.stripeCustomerId,
-      collection_method: 'send_invoice',
-      days_until_due: 7,
       metadata: { internal_contract_id: params.contractId, payment_type: 'downPayment' },
-    });
+    };
+
+    if (params.paymentMethodId) {
+      invoiceParams.collection_method = 'charge_automatically';
+      invoiceParams.default_payment_method = params.paymentMethodId;
+    } else {
+      invoiceParams.collection_method = 'send_invoice';
+      invoiceParams.days_until_due = 7;
+    }
+
+    const invoice = await this.stripe.invoices.create(invoiceParams);
 
     if (!invoice.id) {
       throw new Error('Stripe returned invoice without id');
     }
+
+    // When default_payment_method is set with charge_automatically, Stripe
+    // attempts payment automatically right after finalize. Otherwise the
+    // invoice is sent to the customer for manual payment within days_until_due.
     await this.stripe.invoices.finalizeInvoice(invoice.id);
+
     return invoice.id;
   }
 
@@ -141,6 +198,20 @@ export class StripeService {
     } catch (error) {
       console.error(`Failed to delete Stripe customer ${customerId}:`, error);
     }
+  }
+
+  /**
+   * Verifica a assinatura HMAC de um webhook do Stripe usando o STRIPE_WEBHOOK_SECRET.
+   * O `payload` deve ser o body raw (Buffer ou string), não JSON parseado.
+   */
+  verifyWebhookSignature(payload: string | Buffer, signature: string): Stripe.Event {
+    if (!this.stripe) {
+      throw new Error('Stripe is not enabled');
+    }
+    if (!STRIPE_WEBHOOK_SECRET) {
+      throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
+    }
+    return this.stripe.webhooks.constructEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
   }
 }
 

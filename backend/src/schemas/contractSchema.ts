@@ -13,6 +13,7 @@ export const createContractSchema = z.object({
   status: z.enum(['ativo', 'liquidado', 'cancelado', 'suspenso']).optional(),
   notes: z.string().max(2000).optional().nullable(),
   payment_method: z.string().max(50).optional().nullable(),
+  payment_method_id: z.string().max(255).optional().nullable(),
   positive_balance: z.number().min(0).optional().nullable(),
   negative_balance: z.number().min(0).optional().nullable(),
 }).strict();

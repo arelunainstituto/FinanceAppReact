@@ -59,7 +59,7 @@ export interface Payment {
   amount: number;
   due_date: Date;
   paid_date?: Date;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'failed';
   payment_method?: string;
   payment_type?: 'normalPayment' | 'downPayment';
   paid_amount?: number;

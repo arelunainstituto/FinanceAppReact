@@ -10,6 +10,7 @@ import routes from './routes';
 import { logger } from './middlewares/logger';
 import { errorHandler, notFound } from './middlewares/errorHandler';
 import { SchedulerService } from './services/schedulerService';
+import { StripeController } from './controllers/stripeController';
 
 const app = express();
 const PORT = process.env.PORT || 3030;
@@ -29,11 +30,14 @@ const allowedOrigins = process.env.NODE_ENV === 'production'
       'http://localhost:8081',
       'http://localhost:8082',
       'http://localhost:8088',
+      'http://localhost:19000',
+      'http://localhost:19006',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
       'http://127.0.0.1:8081',
       'http://127.0.0.1:8082',
-      'http://127.0.0.1:8088'
+      'http://127.0.0.1:8088',
+      'http://127.0.0.1:19006'
     ];
 
 const corsOptions = {
@@ -57,6 +61,15 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 app.use(cors(corsOptions));
+
+// Stripe webhook MUST receive the raw body (before express.json) so the signature
+// can be verified. Mounted directly at /api/stripe/webhook.
+const stripeController = new StripeController();
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  stripeController.handleWebhook,
+);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
