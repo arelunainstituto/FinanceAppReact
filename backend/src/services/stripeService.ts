@@ -21,14 +21,6 @@ export interface CreateScheduleParams {
   intervalMonths?: number;
 }
 
-export interface CreateDownPaymentInvoiceParams {
-  stripeCustomerId: string;
-  amount: number;
-  contractId: string;
-  description: string;
-  paymentMethodId?: string;
-}
-
 export interface SetupIntentResult {
   clientSecret: string;
   customerId: string;
@@ -117,6 +109,8 @@ export class StripeService {
         ? { interval: 'year', interval_count: 1 }
         : { interval: 'month', interval_count: intervalMonths };
 
+    console.log(`[Stripe] Creating price: ${this.toCents(params.installmentAmount)} cents (€${params.installmentAmount}), interval: ${intervalMonths} month(s)`);
+
     const price = await this.stripe.prices.create({
       currency: STRIPE_CURRENCY,
       unit_amount: this.toCents(params.installmentAmount),
@@ -125,9 +119,12 @@ export class StripeService {
       metadata: { internal_contract_id: params.contractId },
     });
 
+    const startDateUnix = Math.floor(params.firstInstallmentDate.getTime() / 1000);
+    console.log(`[Stripe] Schedule start_date: ${params.firstInstallmentDate.toISOString()} (unix: ${startDateUnix}), iterations: ${params.numberOfPayments}`);
+
     const scheduleParams: Stripe.SubscriptionScheduleCreateParams = {
       customer: params.stripeCustomerId,
-      start_date: Math.floor(params.firstInstallmentDate.getTime() / 1000),
+      start_date: startDateUnix,
       end_behavior: 'cancel',
       phases: [{
         items: [{ price: price.id, quantity: 1 }],
@@ -145,45 +142,8 @@ export class StripeService {
     }
 
     const schedule = await this.stripe.subscriptionSchedules.create(scheduleParams);
+    console.log(`[Stripe] Subscription schedule created: ${schedule.id}, status: ${schedule.status}`);
     return schedule.id;
-  }
-
-  async createDownPaymentInvoice(params: CreateDownPaymentInvoiceParams): Promise<string | null> {
-    if (!this.stripe) return null;
-
-    await this.stripe.invoiceItems.create({
-      customer: params.stripeCustomerId,
-      amount: this.toCents(params.amount),
-      currency: STRIPE_CURRENCY,
-      description: params.description,
-      metadata: { internal_contract_id: params.contractId, payment_type: 'downPayment' },
-    });
-
-    const invoiceParams: Stripe.InvoiceCreateParams = {
-      customer: params.stripeCustomerId,
-      metadata: { internal_contract_id: params.contractId, payment_type: 'downPayment' },
-    };
-
-    if (params.paymentMethodId) {
-      invoiceParams.collection_method = 'charge_automatically';
-      invoiceParams.default_payment_method = params.paymentMethodId;
-    } else {
-      invoiceParams.collection_method = 'send_invoice';
-      invoiceParams.days_until_due = 7;
-    }
-
-    const invoice = await this.stripe.invoices.create(invoiceParams);
-
-    if (!invoice.id) {
-      throw new Error('Stripe returned invoice without id');
-    }
-
-    // When default_payment_method is set with charge_automatically, Stripe
-    // attempts payment automatically right after finalize. Otherwise the
-    // invoice is sent to the customer for manual payment within days_until_due.
-    await this.stripe.invoices.finalizeInvoice(invoice.id);
-
-    return invoice.id;
   }
 
   async cancelSchedule(scheduleId: string): Promise<void> {

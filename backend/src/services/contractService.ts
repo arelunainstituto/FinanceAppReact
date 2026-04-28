@@ -86,12 +86,14 @@ export class ContractService {
     const processedData = { ...contractData } as any;
 
     // Extract payment_method (será usado nas parcelas, não no contrato)
-    const paymentMethod = processedData.payment_method;
+    const paymentMethod: string | undefined = processedData.payment_method;
     delete processedData.payment_method;
 
     // Extract payment_method_id (Stripe PaymentMethod, não persistido no contrato)
     const paymentMethodId: string | undefined = processedData.payment_method_id ?? undefined;
     delete processedData.payment_method_id;
+
+    const isStripePayment = paymentMethod === 'Stripe';
     
     // Set default status if not provided
     if (!processedData.status) {
@@ -142,12 +144,17 @@ export class ContractService {
     if (createdContract.start_date && createdContract.number_of_payments && createdContract.number_of_payments > 0) {
       await this.generateAutomaticPayments(createdContract, paymentMethod);
 
-      if (stripeService.isEnabled()) {
+      // Só sincronizar com a Stripe quando o método de pagamento é explicitamente "Stripe"
+      // e o serviço está habilitado. Outros métodos (DD, TRF, etc.) ficam apenas no DB.
+      if (isStripePayment && stripeService.isEnabled()) {
+        console.log(`[Stripe] Syncing contract ${createdContract.id} to Stripe (payment_method: ${paymentMethod})`);
         await this.syncContractToStripe(createdContract, client, paymentMethodId);
         const updatedContract = await this.contractRepository.findById(createdContract.id);
         if (updatedContract) {
           return updatedContract;
         }
+      } else if (isStripePayment && !stripeService.isEnabled()) {
+        console.warn(`[Stripe] Payment method is Stripe but Stripe service is not enabled. Skipping sync.`);
       }
     }
 
@@ -155,13 +162,13 @@ export class ContractService {
   }
 
   /**
-   * Sincroniza o contrato com o Stripe: garante Customer, cria Subscription Schedule
-   * e (se houver) Invoice avulsa para a entrada. Em caso de falha, faz rollback total
-   * (cancela schedule/invoice no Stripe, apaga parcelas e contrato no banco).
+   * Sincroniza o contrato com o Stripe: garante Customer e cria Subscription Schedule
+   * para as parcelas. A entrada (down payment) NÃO é enviada para a Stripe — é gerida
+   * localmente. Em caso de falha, faz rollback total (cancela schedule no Stripe,
+   * apaga parcelas e contrato no banco).
    */
   private async syncContractToStripe(contract: Contract, client: Client, paymentMethodId?: string): Promise<void> {
     let createdScheduleId: string | null = null;
-    let createdInvoiceId: string | null = null;
     let stripeCustomerId = client.external_id || null;
     let createdNewCustomer = false;
 
@@ -171,6 +178,7 @@ export class ContractService {
         if (stripeCustomerId) {
           createdNewCustomer = true;
           await this.clientRepository.update(client.id, { external_id: stripeCustomerId });
+          console.log(`[Stripe] Created new customer ${stripeCustomerId} for client ${client.id}`);
         }
       }
 
@@ -187,7 +195,27 @@ export class ContractService {
 
       const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
       const startDate = new Date(contract.start_date as any);
-      const firstInstallmentDate = addMonthsClamped(startDate, intervalMonths);
+      let firstInstallmentDate = addMonthsClamped(startDate, intervalMonths);
+
+      // Se a data da 1ª parcela ficou no passado, ajustar para o futuro mais próximo
+      const now = new Date();
+      if (firstInstallmentDate <= now) {
+        console.warn(`[Stripe] firstInstallmentDate (${firstInstallmentDate.toISOString()}) is in the past. Adjusting to tomorrow.`);
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        firstInstallmentDate = tomorrow;
+      }
+
+      console.log(`[Stripe] Creating subscription schedule:`, {
+        customer: stripeCustomerId,
+        installmentAmount,
+        numberOfPayments,
+        firstInstallmentDate: firstInstallmentDate.toISOString(),
+        intervalMonths,
+        contractId: contract.id,
+        hasPaymentMethod: !!paymentMethodId,
+      });
 
       createdScheduleId = await stripeService.createSubscriptionSchedule({
         stripeCustomerId,
@@ -200,25 +228,16 @@ export class ContractService {
         intervalMonths,
       });
 
-      if (downPaymentValue > 0) {
-        createdInvoiceId = await stripeService.createDownPaymentInvoice({
-          stripeCustomerId,
-          amount: downPaymentValue,
-          contractId: contract.id,
-          description: `Entrada - Contrato ${contract.contract_number ?? contract.id}`,
-          paymentMethodId,
-        });
-      }
+      // Nota: A entrada (down payment) NÃO é lançada na Stripe.
+      // A entrada fica apenas no DB local como parcela do tipo 'downPayment'.
 
       if (createdScheduleId) {
         await this.contractRepository.update(contract.id, { stripe_schedule_id: createdScheduleId });
+        console.log(`[Stripe] Subscription schedule ${createdScheduleId} created and linked to contract ${contract.id}`);
       }
     } catch (error) {
-      console.error(`Stripe sync failed for contract ${contract.id}, rolling back:`, error);
+      console.error(`[Stripe] Sync failed for contract ${contract.id}, rolling back:`, error);
 
-      if (createdInvoiceId) {
-        await stripeService.voidInvoice(createdInvoiceId);
-      }
       if (createdScheduleId) {
         await stripeService.cancelSchedule(createdScheduleId);
       }
@@ -231,7 +250,7 @@ export class ContractService {
         await this.paymentRepository.deleteByContractId(contract.id);
         await this.contractRepository.delete(contract.id);
       } catch (rollbackError) {
-        console.error(`Rollback in DB failed for contract ${contract.id}:`, rollbackError);
+        console.error(`[Stripe] Rollback in DB failed for contract ${contract.id}:`, rollbackError);
       }
 
       throw createError('Failed to sync contract with Stripe', 502);
