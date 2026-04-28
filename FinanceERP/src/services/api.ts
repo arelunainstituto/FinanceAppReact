@@ -482,6 +482,13 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  async createStripeSetupIntent(clientId: string): Promise<ApiResponse<{ client_secret: string; customer_id: string }>> {
+    return this.request<{ client_secret: string; customer_id: string }>('/stripe/setup-intent', {
+      method: 'POST',
+      body: JSON.stringify({ client_id: clientId }),
+    });
+  }
 }
 
 export default new ApiService();

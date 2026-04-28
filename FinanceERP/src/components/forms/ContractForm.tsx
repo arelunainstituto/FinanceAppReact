@@ -105,6 +105,15 @@ const ContractForm: React.FC<ContractFormProps> = ({
     { value: 'jurídico', label: 'Jurídico' },
   ];
 
+  // Opções de frequência de pagamento
+  const paymentFrequencyOptions = [
+    { value: 'Mensal', label: 'Mensal' },
+    { value: 'Bimensal', label: 'Bimensal' },
+    { value: 'Trimestral', label: 'Trimestral' },
+    { value: 'Semestral', label: 'Semestral' },
+    { value: 'Anual', label: 'Anual' },
+  ];
+
   // Opções de método de pagamento
   const paymentMethodOptions = PAYMENT_METHODS;
 
@@ -469,12 +478,28 @@ const ContractForm: React.FC<ContractFormProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Pagamento</Text>
               
-              <Input
-                label="Frequência de Pagamento"
-                value={formData.payment_frequency}
-                onChangeText={(value) => updateField('payment_frequency', value)}
-                placeholder="Ex: Mensal, Trimestral, etc."
-              />
+              <Text style={styles.inputLabel}>Frequência de Pagamento</Text>
+              <View style={styles.statusContainer}>
+                {paymentFrequencyOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.statusOption,
+                      formData.payment_frequency === option.value && styles.statusOptionSelected,
+                    ]}
+                    onPress={() => updateField('payment_frequency', option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        formData.payment_frequency === option.value && styles.statusOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               <NumericInput
                 label="Entrada"
@@ -787,36 +812,40 @@ const styles = StyleSheet.create({
   },
   // Payment method styles
   paymentMethodContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
   },
   paymentMethodOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
     backgroundColor: '#FFFFFF',
-    gap: 12,
+    gap: 8,
+    flexBasis: '48%',
+    flexGrow: 1,
   },
   paymentMethodOptionSelected: {
     backgroundColor: '#3B82F6',
     borderColor: '#3B82F6',
   },
   paymentMethodText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#374151',
-    flex: 1,
+    flexShrink: 1,
   },
   paymentMethodTextSelected: {
     color: '#FFFFFF',
   },
   paymentMethodIcon: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
   },
   // Installment preview styles
   installmentPreview: {

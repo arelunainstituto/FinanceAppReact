@@ -550,8 +550,8 @@ const ClientsScreen: React.FC = () => {
       align: 'left',
       width: '14%',
       render: (client: Client) => (
-        <StatusBadge 
-          label={client.status.toUpperCase()} 
+        <StatusBadge
+          label={(client.status || 'inativo').toUpperCase()}
           variant={client.status === 'ativo' ? 'success' : 'default'}
         />
       ),
