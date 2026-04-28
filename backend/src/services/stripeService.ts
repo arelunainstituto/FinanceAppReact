@@ -82,12 +82,14 @@ export class StripeService {
       }
     }
 
+    console.log(`[Stripe] Creating SetupIntent for customer ${stripeCustomerId}`);
     const setupIntent = await this.stripe.setupIntents.create({
       customer: stripeCustomerId,
       payment_method_types: ['card', 'sepa_debit'],
       usage: 'off_session',
       metadata: { internal_client_id: client.id },
     });
+    console.log(`[Stripe] SetupIntent created: ${setupIntent.id}, status: ${setupIntent.status}`);
 
     if (!setupIntent.client_secret) {
       throw new Error('Stripe returned SetupIntent without client_secret');
@@ -144,6 +146,41 @@ export class StripeService {
     const schedule = await this.stripe.subscriptionSchedules.create(scheduleParams);
     console.log(`[Stripe] Subscription schedule created: ${schedule.id}, status: ${schedule.status}`);
     return schedule.id;
+  }
+
+  /**
+   * Remove todos os invoice items pendentes (não associados a uma invoice) de um customer.
+   * Estes itens acumulam-se quando a criação de invoices falha e são automaticamente
+   * anexados à próxima invoice do customer — causando valores inflacionados.
+   */
+  async clearPendingInvoiceItems(customerId: string): Promise<number> {
+    if (!this.stripe) return 0;
+
+    let cleared = 0;
+    try {
+      const items = await this.stripe.invoiceItems.list({
+        customer: customerId,
+        pending: true,
+        limit: 100,
+      });
+
+      for (const item of items.data) {
+        try {
+          await this.stripe.invoiceItems.del(item.id);
+          cleared++;
+        } catch (err) {
+          console.warn(`[Stripe] Failed to delete invoice item ${item.id}:`, err);
+        }
+      }
+
+      if (cleared > 0) {
+        console.log(`[Stripe] 🧹 Cleared ${cleared} pending invoice items for customer ${customerId}`);
+      }
+    } catch (error) {
+      console.error(`[Stripe] Failed to list/clear pending invoice items for ${customerId}:`, error);
+    }
+
+    return cleared;
   }
 
   async cancelSchedule(scheduleId: string): Promise<void> {

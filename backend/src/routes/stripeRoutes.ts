@@ -9,4 +9,7 @@ const stripeController = new StripeController();
 // The frontend uses this to capture card/SEPA data via Stripe Embedded Payment Element.
 router.post('/setup-intent', authenticateToken, stripeController.createSetupIntent);
 
+// Cleanup: remove orphaned invoice items from all Stripe customers
+router.post('/cleanup-pending-items', authenticateToken, stripeController.cleanupPendingInvoiceItems);
+
 export default router;

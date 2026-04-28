@@ -54,7 +54,7 @@ const InnerForm: React.FC<InnerFormProps> = ({ onPaymentMethodReady, onCancel, s
 
   return (
     <View>
-      <PaymentElement options={{ layout: 'tabs' }} />
+      <PaymentElement options={{ layout: 'tabs', wallets: { applePay: 'never', googlePay: 'never' } }} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.actions}>
         {onCancel ? (

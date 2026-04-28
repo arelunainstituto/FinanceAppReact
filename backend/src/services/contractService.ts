@@ -186,12 +186,28 @@ export class ContractService {
         throw new Error('Stripe customer id is unavailable');
       }
 
+      // Limpar invoice items pendentes órfãos (de tentativas anteriores falhadas)
+      // para evitar que sejam anexados à primeira invoice da nova subscription.
+      await stripeService.clearPendingInvoiceItems(stripeCustomerId);
+
       const totalValue = Number(contract.value);
       const downPaymentValue = Number(contract.down_payment) || 0;
       const numberOfPayments = Number(contract.number_of_payments);
       const remainingValue = subtractMoneyValues(totalValue, downPaymentValue);
       const installmentValues = divideIntoInstallments(remainingValue, numberOfPayments);
       const installmentAmount = installmentValues[0];
+
+      console.log(`[Stripe] 📊 Contract value calculation:`, {
+        contractId: contract.id,
+        contractNumber: contract.contract_number,
+        'contract.value (raw)': contract.value,
+        'contract.down_payment (raw)': contract.down_payment,
+        totalValue,
+        downPaymentValue,
+        numberOfPayments,
+        remainingValue,
+        installmentAmount,
+      });
 
       const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
       const startDate = new Date(contract.start_date as any);

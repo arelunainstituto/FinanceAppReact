@@ -3,15 +3,18 @@ import Stripe from 'stripe';
 import { stripeService } from '../services/stripeService';
 import { ClientRepository } from '../repositories/clientRepository';
 import { PaymentRepository } from '../repositories/paymentRepository';
+import { ContractRepository } from '../repositories/contractRepository';
 import { createError } from '../middlewares/errorHandler';
 
 export class StripeController {
   private readonly clientRepository: ClientRepository;
   private readonly paymentRepository: PaymentRepository;
+  private readonly contractRepository: ContractRepository;
 
   constructor() {
     this.clientRepository = new ClientRepository();
     this.paymentRepository = new PaymentRepository();
+    this.contractRepository = new ContractRepository();
   }
 
   createSetupIntent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -46,6 +49,46 @@ export class StripeController {
           client_secret: result.clientSecret,
           customer_id: result.customerId,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Limpa invoice items pendentes (órfãos) de TODOS os clientes Stripe.
+   * Estes itens foram criados pela lógica antiga de down payment que
+   * criava invoiceItems mas falhava antes de finalizar a invoice.
+   */
+  cleanupPendingInvoiceItems = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!stripeService.isEnabled()) {
+        throw createError('Stripe is not enabled on this server', 503);
+      }
+
+      // Buscar todos os clientes que têm external_id (Stripe customer)
+      const allClients = await this.clientRepository.findAll();
+      const stripeClients = allClients.filter(c => c.external_id);
+
+      let totalCleared = 0;
+      const results: { clientName: string; customerId: string; cleared: number }[] = [];
+
+      for (const client of stripeClients) {
+        const cleared = await stripeService.clearPendingInvoiceItems(client.external_id!);
+        if (cleared > 0) {
+          totalCleared += cleared;
+          results.push({
+            clientName: `${client.first_name} ${client.last_name || ''}`.trim(),
+            customerId: client.external_id!,
+            cleared,
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Cleared ${totalCleared} pending invoice items from ${results.length} customers`,
+        data: results,
       });
     } catch (error) {
       next(error);
