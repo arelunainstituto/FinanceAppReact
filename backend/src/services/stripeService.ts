@@ -14,6 +14,11 @@ export interface CreateScheduleParams {
   contractId: string;
   contractDescription: string;
   paymentMethodId?: string;
+  /**
+   * Number of months between each installment (1 = mensal, 2 = bimensal, ...).
+   * Defaults to 1.
+   */
+  intervalMonths?: number;
 }
 
 export interface CreateDownPaymentInvoiceParams {
@@ -105,10 +110,17 @@ export class StripeService {
   async createSubscriptionSchedule(params: CreateScheduleParams): Promise<string | null> {
     if (!this.stripe) return null;
 
+    const intervalMonths = Math.max(1, Math.floor(params.intervalMonths || 1));
+
+    const recurring: Stripe.PriceCreateParams.Recurring =
+      intervalMonths === 12
+        ? { interval: 'year', interval_count: 1 }
+        : { interval: 'month', interval_count: intervalMonths };
+
     const price = await this.stripe.prices.create({
       currency: STRIPE_CURRENCY,
       unit_amount: this.toCents(params.installmentAmount),
-      recurring: { interval: 'month' },
+      recurring,
       product_data: { name: params.contractDescription },
       metadata: { internal_contract_id: params.contractId },
     });
@@ -120,6 +132,7 @@ export class StripeService {
       phases: [{
         items: [{ price: price.id, quantity: 1 }],
         iterations: params.numberOfPayments,
+        proration_behavior: 'none',
       }],
       metadata: { internal_contract_id: params.contractId },
     };

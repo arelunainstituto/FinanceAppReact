@@ -85,3 +85,47 @@ export const isBusinessDay = (date: Date): boolean => {
   const dayOfWeek = date.getDay();
   return dayOfWeek >= 1 && dayOfWeek <= 5; // 1 = segunda, 5 = sexta
 };
+
+/**
+ * Soma N meses preservando o dia da âncora, mas truncando para o último
+ * dia do mês quando o dia original não existir no mês de destino
+ * (ex: 31/jan + 1 mês = 28/fev em ano não bissexto).
+ *
+ * Replica o comportamento de billing_cycle_anchor da Stripe, garantindo
+ * alinhamento exato entre as datas de vencimento das parcelas geradas no
+ * banco e as datas em que a Stripe efetivamente cobra cada iteração.
+ *
+ * @param date Data âncora
+ * @param months Número de meses a somar (pode ser negativo)
+ * @returns Nova Date com clamping
+ */
+export const addMonthsClamped = (date: Date, months: number): Date => {
+  const day = date.getDate();
+  const target = new Date(date.getFullYear(), date.getMonth() + months, 1, date.getHours(), date.getMinutes(), date.getSeconds());
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(day, lastDay));
+  return target;
+};
+
+/**
+ * Converte um rótulo de frequência de pagamento para o número de meses
+ * por iteração. Usado tanto na geração local de parcelas como na criação
+ * do recurring price na Stripe.
+ *
+ * Default: 1 mês (Mensal).
+ */
+export const getMonthsForPaymentFrequency = (frequency?: string | null): number => {
+  switch ((frequency || '').toLowerCase()) {
+    case 'bimensal':
+      return 2;
+    case 'trimestral':
+      return 3;
+    case 'semestral':
+      return 6;
+    case 'anual':
+      return 12;
+    case 'mensal':
+    default:
+      return 1;
+  }
+};

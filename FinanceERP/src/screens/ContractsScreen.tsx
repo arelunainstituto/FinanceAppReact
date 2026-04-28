@@ -69,7 +69,7 @@ const ContractsScreen: React.FC = () => {
   // Contract details modal states
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
-  
+
   // Advanced filters states
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<ContractAdvancedFiltersData>({});
@@ -347,36 +347,46 @@ useEffect(() => {
   const handleSubmitContract = async (contractData: Omit<Contract, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setIsSubmitting(true);
-      
+
       if (editingContract) {
         // Update existing contract
         const response = await ApiService.updateContract(editingContract.id, contractData);
         if (response.success && response.data) {
-          // Atualizar ambos os estados: contracts e filteredContracts
           const updatedContracts = contracts.map(c => c.id === editingContract.id ? response.data : c);
           setContracts(updatedContracts);
           setFilteredContracts(filteredContracts.map(c => c.id === editingContract.id ? response.data : c));
           Alert.alert('Sucesso', 'Contrato actualizado com sucesso');
         } else {
           Alert.alert('Erro', 'Não foi possível actualizar o contrato');
+          throw new Error('Update returned no data');
         }
-      } else {
-        // Create new contract
-        const response = await ApiService.createContract(contractData);
-        if (response.success && response.data) {
-          // Reload the complete list from server to ensure data consistency
-          await loadContracts();
-          Alert.alert('Sucesso', 'Contrato criado com sucesso');
-        } else {
-          Alert.alert('Erro', 'Não foi possível criar o contrato');
-        }
+        setEditingContract(null);
+        return;
       }
-      
-      setShowContractForm(false);
+
+      // Novo contrato: se Stripe, contractData já vem com payment_method_id
+      // (capturado pelo wizard via SetupIntent). Caso contrário, é um método
+      // não-Stripe e criamos diretamente.
+      const response = await ApiService.createContract(contractData);
+      if (response.success && response.data) {
+        await loadContracts();
+        const isStripe = (contractData as any).payment_method === 'Stripe';
+        Alert.alert(
+          'Sucesso',
+          isStripe
+            ? 'Contrato criado e cartão autorizado com sucesso'
+            : 'Contrato criado com sucesso'
+        );
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar o contrato');
+        throw new Error('Create returned no data');
+      }
       setEditingContract(null);
     } catch (error) {
       console.error('Error submitting contract:', error);
-      Alert.alert('Erro', 'Não foi possível guardar o contrato');
+      // Re-lança para o wizard saber que falhou e manter-se aberto (importante
+      // no fluxo Stripe — sem isso o modal fecharia mesmo em caso de erro).
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -748,7 +758,7 @@ useEffect(() => {
         }}
         contractId={selectedContractId}
       />
-      
+
       <ContractAdvancedFilters
          visible={showAdvancedFilters}
          onClose={() => setShowAdvancedFilters(false)}

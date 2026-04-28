@@ -4,6 +4,7 @@ import { PaymentRepository } from '../repositories/paymentRepository';
 import { Contract, Payment, Client } from '../models';
 import { createError } from '../middlewares/errorHandler';
 import { divideIntoInstallments, subtractMoneyValues } from '../utils/moneyUtils';
+import { addMonthsClamped, getMonthsForPaymentFrequency } from '../utils/dateUtils';
 import { stripeService } from './stripeService';
 
 export class ContractService {
@@ -184,9 +185,9 @@ export class ContractService {
       const installmentValues = divideIntoInstallments(remainingValue, numberOfPayments);
       const installmentAmount = installmentValues[0];
 
+      const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
       const startDate = new Date(contract.start_date as any);
-      const firstInstallmentDate = new Date(startDate);
-      firstInstallmentDate.setMonth(startDate.getMonth() + 1);
+      const firstInstallmentDate = addMonthsClamped(startDate, intervalMonths);
 
       createdScheduleId = await stripeService.createSubscriptionSchedule({
         stripeCustomerId,
@@ -196,6 +197,7 @@ export class ContractService {
         contractId: contract.id,
         contractDescription: `Contrato ${contract.contract_number ?? contract.id}`,
         paymentMethodId,
+        intervalMonths,
       });
 
       if (downPaymentValue > 0) {
@@ -383,10 +385,13 @@ export class ContractService {
         });
       }
 
-      // Criar parcelas mensais com valores precisos
+      // Calcular intervalo entre parcelas (em meses) com base na frequência
+      const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
+
+      // Criar parcelas com valores precisos e datas alinhadas à Stripe
+      // (clamping de fim-de-mês: 31/jan + 1 mês = 28/fev no DB e na Stripe)
       for (let i = 1; i <= numberOfPayments; i++) {
-        const dueDate = new Date(startDate);
-        dueDate.setMonth(startDate.getMonth() + i);
+        const dueDate = addMonthsClamped(startDate, i * intervalMonths);
 
         // Verificar se a data de vencimento não é anterior à data atual
         const today = new Date();
