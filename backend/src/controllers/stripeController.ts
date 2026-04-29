@@ -3,18 +3,15 @@ import Stripe from 'stripe';
 import { stripeService } from '../services/stripeService';
 import { ClientRepository } from '../repositories/clientRepository';
 import { PaymentRepository } from '../repositories/paymentRepository';
-import { ContractRepository } from '../repositories/contractRepository';
 import { createError } from '../middlewares/errorHandler';
 
 export class StripeController {
   private readonly clientRepository: ClientRepository;
   private readonly paymentRepository: PaymentRepository;
-  private readonly contractRepository: ContractRepository;
 
   constructor() {
     this.clientRepository = new ClientRepository();
     this.paymentRepository = new PaymentRepository();
-    this.contractRepository = new ContractRepository();
   }
 
   createSetupIntent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -60,7 +57,7 @@ export class StripeController {
    * Estes itens foram criados pela lógica antiga de down payment que
    * criava invoiceItems mas falhava antes de finalizar a invoice.
    */
-  cleanupPendingInvoiceItems = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  cleanupPendingInvoiceItems = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!stripeService.isEnabled()) {
         throw createError('Stripe is not enabled on this server', 503);

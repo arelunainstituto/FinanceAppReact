@@ -372,7 +372,9 @@ const ContractForm: React.FC<ContractFormProps> = ({
       if (!day || !month || !year) return '';
       const startDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       const interval = monthsForFrequency(frequency || 'Mensal');
-      const endDateObj = addMonthsClamped(startDateObj, numPayments * interval);
+      // end_date = fim do período de cobertura da última parcela
+      // (startDate + (numPayments + 1) intervalos) para alinhar com a Stripe.
+      const endDateObj = addMonthsClamped(startDateObj, (numPayments + 1) * interval);
 
       const endDay = endDateObj.getDate().toString().padStart(2, '0');
       const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
@@ -781,7 +783,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
             <SummaryRow label="Início" value={formData.start_date} />
           ) : null}
           {formData.end_date ? (
-            <SummaryRow label="Última parcela" value={formData.end_date} />
+            <SummaryRow label="Fim do contrato" value={formData.end_date} />
           ) : null}
         </View>
 
