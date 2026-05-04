@@ -112,6 +112,12 @@ export class ContractService {
       processedData.end_date = this.convertDateFormat(processedData.end_date);
     }
 
+    if (processedData.first_installment_date === '') {
+      processedData.first_installment_date = null;
+    } else if (processedData.first_installment_date) {
+      processedData.first_installment_date = this.convertDateFormat(processedData.first_installment_date);
+    }
+
     // Validate date formats if they are provided
     if (processedData.start_date && typeof processedData.start_date === 'string') {
       const dateRegex = /^(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})$/;
@@ -131,7 +137,7 @@ export class ContractService {
     if (processedData.start_date && processedData.end_date) {
       const startDate = new Date(processedData.start_date);
       const endDate = new Date(processedData.end_date);
-      
+
       if (endDate <= startDate) {
         throw createError('End date must be after start date', 400);
       }
@@ -211,7 +217,12 @@ export class ContractService {
 
       const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
       const startDate = new Date(contract.start_date as any);
-      let firstInstallmentDate = addMonthsClamped(startDate, intervalMonths);
+      // Se houver first_installment_date no contrato, usa-o como âncora para a Stripe
+      // (mantém alinhamento com generateAutomaticPayments). Caso contrário, usa o
+      // comportamento legado: start_date + 1 intervalo.
+      let firstInstallmentDate = contract.first_installment_date
+        ? new Date(contract.first_installment_date as any)
+        : addMonthsClamped(startDate, intervalMonths);
 
       // Se a data da 1ª parcela ficou no passado, ajustar para o futuro mais próximo
       const now = new Date();
@@ -273,6 +284,139 @@ export class ContractService {
     }
   }
 
+  /**
+   * Pré-visualização de quais parcelas seriam sincronizadas no Stripe para um
+   * contrato existente. Filtra apenas as pendentes (não-atrasadas, não-pagas)
+   * do tipo normalPayment.
+   */
+  async getStripeSyncPreview(contractId: string): Promise<{
+    contract: Contract;
+    client: Client;
+    eligiblePayments: Payment[];
+    installmentAmount: number;
+    firstInstallmentDate: Date;
+    intervalMonths: number;
+    alreadySynced: boolean;
+  }> {
+    const contract = await this.contractRepository.findById(contractId);
+    if (!contract) throw createError('Contract not found', 404);
+
+    const client = await this.clientRepository.findById(contract.client_id);
+    if (!client) throw createError('Client not found', 404);
+
+    const allPayments = await this.paymentRepository.findByContractId(contractId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const eligiblePayments = allPayments
+      .filter(
+        (p) =>
+          p.payment_type === 'normalPayment' &&
+          p.status === 'pending' &&
+          new Date(p.due_date) >= today,
+      )
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
+    const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
+    const firstInstallmentDate = eligiblePayments[0]
+      ? new Date(eligiblePayments[0].due_date)
+      : new Date();
+    const installmentAmount = eligiblePayments[0] ? Number(eligiblePayments[0].amount) : 0;
+
+    return {
+      contract,
+      client,
+      eligiblePayments,
+      installmentAmount,
+      firstInstallmentDate,
+      intervalMonths,
+      alreadySynced: !!contract.stripe_schedule_id,
+    };
+  }
+
+  /**
+   * Sincroniza um contrato existente com o Stripe (caso de uso: contrato criado
+   * sem Stripe inicialmente, ou com pagamentos parciais já feitos localmente).
+   * Cria SubscriptionSchedule a partir das parcelas pendentes não-atrasadas.
+   * Atrasadas e pagas permanecem no DB sem alteração.
+   */
+  async syncExistingContractToStripe(contractId: string, paymentMethodId?: string): Promise<Contract> {
+    if (!stripeService.isEnabled()) {
+      throw createError('Stripe service is not enabled', 503);
+    }
+
+    const preview = await this.getStripeSyncPreview(contractId);
+    const { contract, client, eligiblePayments, installmentAmount, firstInstallmentDate, intervalMonths } = preview;
+
+    if (preview.alreadySynced) {
+      throw createError('Contract is already synced with Stripe', 409);
+    }
+
+    if (eligiblePayments.length === 0) {
+      throw createError('No eligible installments to sync (all payments are paid, overdue, or absent)', 422);
+    }
+
+    let createdScheduleId: string | null = null;
+    let stripeCustomerId = client.external_id || null;
+    let createdNewCustomer = false;
+
+    try {
+      if (!stripeCustomerId) {
+        stripeCustomerId = await stripeService.createCustomer(client);
+        if (stripeCustomerId) {
+          createdNewCustomer = true;
+          await this.clientRepository.update(client.id, { external_id: stripeCustomerId });
+          console.log(`[Stripe Sync] Created customer ${stripeCustomerId} for client ${client.id}`);
+        }
+      }
+      if (!stripeCustomerId) {
+        throw new Error('Stripe customer id is unavailable');
+      }
+
+      await stripeService.clearPendingInvoiceItems(stripeCustomerId);
+
+      console.log(`[Stripe Sync] Creating schedule for contract ${contract.id}:`, {
+        eligibleCount: eligiblePayments.length,
+        installmentAmount,
+        firstInstallmentDate: firstInstallmentDate.toISOString(),
+        intervalMonths,
+        hasPaymentMethod: !!paymentMethodId,
+      });
+
+      createdScheduleId = await stripeService.createSubscriptionSchedule({
+        stripeCustomerId,
+        installmentAmount,
+        numberOfPayments: eligiblePayments.length,
+        firstInstallmentDate,
+        contractId: contract.id,
+        contractDescription: `Contrato ${contract.contract_number ?? contract.id}`,
+        paymentMethodId,
+        intervalMonths,
+      });
+
+      if (createdScheduleId) {
+        await this.contractRepository.update(contract.id, { stripe_schedule_id: createdScheduleId });
+        console.log(`[Stripe Sync] Schedule ${createdScheduleId} linked to contract ${contract.id}`);
+      }
+
+      const updated = await this.contractRepository.findById(contract.id);
+      return updated || contract;
+    } catch (error) {
+      console.error(`[Stripe Sync] Failed for contract ${contract.id}, rolling back:`, error);
+
+      if (createdScheduleId) {
+        await stripeService.cancelSchedule(createdScheduleId);
+      }
+      // Não apagar customer nem parcelas locais — só desfazer o que foi criado no Stripe.
+      // Se acabámos de criar o customer agora, mantemo-lo (pode ser reutilizado).
+      if (createdNewCustomer) {
+        console.log(`[Stripe Sync] Keeping newly-created customer ${stripeCustomerId} for future use`);
+      }
+
+      throw createError('Failed to sync existing contract with Stripe', 502);
+    }
+  }
+
   async updateContract(id: string, contractData: Partial<Omit<Contract, 'id' | 'created_at' | 'updated_at'>>): Promise<Contract> {
     // Check if contract exists
     const existingContract = await this.contractRepository.findById(id);
@@ -316,6 +460,12 @@ export class ContractService {
       processedData.end_date = null;
     } else if (processedData.end_date) {
       processedData.end_date = this.convertDateFormat(processedData.end_date);
+    }
+
+    if (processedData.first_installment_date === '') {
+      processedData.first_installment_date = null;
+    } else if (processedData.first_installment_date) {
+      processedData.first_installment_date = this.convertDateFormat(processedData.first_installment_date);
     }
 
     // Validate date formats if they are provided
@@ -423,10 +573,16 @@ export class ContractService {
       // Calcular intervalo entre parcelas (em meses) com base na frequência
       const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
 
+      // Âncora da 1ª parcela: campo opcional first_installment_date tem prioridade.
+      // Se ausente, mantém o comportamento legado (start_date + 1 intervalo).
+      const anchor = contract.first_installment_date
+        ? new Date(contract.first_installment_date as any)
+        : addMonthsClamped(startDate, intervalMonths);
+
       // Criar parcelas com valores precisos e datas alinhadas à Stripe
       // (clamping de fim-de-mês: 31/jan + 1 mês = 28/fev no DB e na Stripe)
-      for (let i = 1; i <= numberOfPayments; i++) {
-        const dueDate = addMonthsClamped(startDate, i * intervalMonths);
+      for (let i = 0; i < numberOfPayments; i++) {
+        const dueDate = addMonthsClamped(anchor, i * intervalMonths);
 
         // Verificar se a data de vencimento não é anterior à data atual
         const today = new Date();
@@ -434,12 +590,12 @@ export class ContractService {
 
         payments.push({
           contract_id: contract.id,
-          amount: installmentValues[i - 1], // Usar valor preciso da parcela
+          amount: installmentValues[i], // Usar valor preciso da parcela
           due_date: dueDate,
           status: status,
           payment_method: paymentMethod,
           payment_type: 'normalPayment',
-          notes: `${i}/${numberOfPayments}`,
+          notes: `${i + 1}/${numberOfPayments}`,
           external_id: undefined,
           paid_date: undefined,
         });

@@ -11,6 +11,7 @@ export const createContractSchema = z.object({
   number_of_payments: z.number().int().min(0).optional().nullable(),
   start_date: z.string().regex(dateRegex, 'Date must be in DD/MM/YYYY or YYYY-MM-DD format').optional().nullable(),
   end_date: z.string().regex(dateRegex, 'Date must be in DD/MM/YYYY or YYYY-MM-DD format').optional().nullable(),
+  first_installment_date: z.string().regex(dateRegex, 'Date must be in DD/MM/YYYY or YYYY-MM-DD format').optional().nullable(),
   status: z.enum(['ativo', 'liquidado', 'renegociado', 'cancelado', 'suspenso', 'jurídico']).optional(),
   payment_frequency: z.string().max(50).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),

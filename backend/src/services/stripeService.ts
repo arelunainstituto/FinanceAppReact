@@ -132,6 +132,7 @@ export class StripeService {
         items: [{ price: price.id, quantity: 1 }],
         iterations: params.numberOfPayments,
         proration_behavior: 'none',
+        metadata: { internal_contract_id: params.contractId },
       }],
       metadata: { internal_contract_id: params.contractId },
     };
@@ -222,6 +223,82 @@ export class StripeService {
       throw new Error('STRIPE_WEBHOOK_SECRET is not configured');
     }
     return this.stripe.webhooks.constructEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
+  }
+
+  /**
+   * Busca o internal_contract_id a partir da subscription associada a uma invoice.
+   * Usado como fallback quando a invoice não contém metadata diretamente.
+   */
+  async getContractIdFromSubscription(subscriptionId: string): Promise<string | null> {
+    if (!this.stripe) return null;
+    try {
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      return subscription.metadata?.internal_contract_id || null;
+    } catch (error) {
+      console.error(`[Stripe] Failed to retrieve subscription ${subscriptionId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Reconciliação diária: lista invoices pagas nas últimas 48h e retorna
+   * os pares { invoiceId, contractId } para que o controller possa verificar
+   * se os pagamentos locais já foram actualizados.
+   */
+  async listRecentPaidInvoices(hoursBack: number = 48): Promise<Array<{
+    invoiceId: string;
+    contractId: string | null;
+    subscriptionId: string | null;
+    amountPaid: number;
+    paidAt: Date;
+  }>> {
+    if (!this.stripe) return [];
+
+    const since = Math.floor((Date.now() - hoursBack * 60 * 60 * 1000) / 1000);
+    const results: Array<{
+      invoiceId: string;
+      contractId: string | null;
+      subscriptionId: string | null;
+      amountPaid: number;
+      paidAt: Date;
+    }> = [];
+
+    try {
+      for await (const invoice of this.stripe.invoices.list({
+        status: 'paid',
+        created: { gte: since },
+        limit: 100,
+        expand: ['data.subscription'],
+      })) {
+        // Tentar extrair o contractId por várias vias
+        let contractId: string | null =
+          (invoice as any).subscription_details?.metadata?.internal_contract_id
+          || invoice.metadata?.internal_contract_id
+          || invoice.lines?.data?.[0]?.price?.metadata?.internal_contract_id
+          || null;
+
+        // Fallback: ler da subscription diretamente (já expandida)
+        if (!contractId && invoice.subscription && typeof invoice.subscription === 'object') {
+          contractId = (invoice.subscription as any).metadata?.internal_contract_id || null;
+        }
+
+        if (contractId) {
+          results.push({
+            invoiceId: invoice.id,
+            contractId,
+            subscriptionId: typeof invoice.subscription === 'string'
+              ? invoice.subscription
+              : (invoice.subscription as any)?.id || null,
+            amountPaid: (invoice.amount_paid || 0) / 100,
+            paidAt: new Date((invoice.status_transitions?.paid_at || invoice.created) * 1000),
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[Stripe] Failed to list recent paid invoices:', error);
+    }
+
+    return results;
   }
 }
 

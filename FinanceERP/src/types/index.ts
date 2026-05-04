@@ -29,6 +29,7 @@ export interface Contract {
   value?: number;
   start_date?: string;
   end_date?: string;
+  first_installment_date?: string;
   status?: string;
   payment_frequency?: string;
   notes?: string;
@@ -40,6 +41,7 @@ export interface Contract {
   area?: string;
   gestora?: string;
   medico?: string;
+  stripe_schedule_id?: string;
   created_at: string;
   updated_at: string;
   client?: Client;

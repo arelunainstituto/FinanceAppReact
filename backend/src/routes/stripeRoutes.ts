@@ -12,4 +12,8 @@ router.post('/setup-intent', authenticateToken, stripeController.createSetupInte
 // Cleanup: remove orphaned invoice items from all Stripe customers
 router.post('/cleanup-pending-items', authenticateToken, stripeController.cleanupPendingInvoiceItems);
 
+// Reconciliação diária: verifica invoices pagas recentemente no Stripe
+// e atualiza parcelas locais que ainda estejam pendentes.
+router.post('/reconcile', authenticateToken, stripeController.reconcile);
+
 export default router;

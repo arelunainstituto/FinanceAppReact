@@ -12,6 +12,8 @@ import contractRoutes from '../backend/src/routes/contractRoutes';
 import paymentRoutes from '../backend/src/routes/paymentRoutes';
 import dashboardRoutes from '../backend/src/routes/dashboardRoutes';
 import aiAnalystRoutes from '../backend/src/routes/aiAnalystRoutes';
+import stripeRoutes from '../backend/src/routes/stripeRoutes';
+import { StripeController } from '../backend/src/controllers/stripeController';
 
 // Load environment variables
 dotenv.config();
@@ -57,6 +59,15 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Stripe webhook MUST receive the raw body (before express.json) so the HMAC
+// signature can be verified. Mounted directly before body parsing middleware.
+const stripeController = new StripeController();
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  stripeController.handleWebhook,
+);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -71,6 +82,7 @@ app.use('/api/contracts', contractRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai-analyst', aiAnalystRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // Health check route
 app.get('/api/health', (_req, res) => {

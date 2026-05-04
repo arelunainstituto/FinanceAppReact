@@ -206,6 +206,29 @@ class ApiService {
     });
   }
 
+  async getContractStripeSyncPreview(id: string): Promise<ApiResponse<{
+    contractId: string;
+    contractNumber?: string;
+    clientName: string;
+    clientEmail?: string;
+    clientHasStripeCustomer: boolean;
+    alreadySynced: boolean;
+    eligiblePayments: Array<{ id: string; amount: number; due_date: string; notes?: string }>;
+    installmentAmount: number;
+    firstInstallmentDate: string;
+    intervalMonths: number;
+    totalAmount: number;
+  }>> {
+    return this.request(`/contracts/${id}/stripe-sync-preview`);
+  }
+
+  async syncContractToStripe(id: string, paymentMethodId: string): Promise<ApiResponse<Contract>> {
+    return this.request(`/contracts/${id}/stripe-sync`, {
+      method: 'POST',
+      body: JSON.stringify({ payment_method_id: paymentMethodId }),
+    });
+  }
+
   // Payment methods
   async getPayments(): Promise<ApiResponse<Payment[]>> {
     return this.request('/payments');

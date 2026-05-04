@@ -37,6 +37,7 @@ export interface Contract {
   value: number;
   start_date?: Date;
   end_date?: Date;
+  first_installment_date?: Date;
   status?: string;
   payment_frequency?: string;
   notes?: string;

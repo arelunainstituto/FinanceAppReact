@@ -213,11 +213,57 @@ export class ContractController {
     try {
       const { id } = req.params;
       const balances = await this.contractService.getContractBalances(id);
-      
+
       res.status(200).json({
         success: true,
         message: 'Contract balances retrieved successfully',
         data: balances,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getStripeSyncPreview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const preview = await this.contractService.getStripeSyncPreview(id);
+      res.status(200).json({
+        success: true,
+        message: 'Stripe sync preview retrieved successfully',
+        data: {
+          contractId: preview.contract.id,
+          contractNumber: preview.contract.contract_number,
+          clientName: `${preview.client.first_name}${preview.client.last_name ? ' ' + preview.client.last_name : ''}`,
+          clientEmail: preview.client.email,
+          clientHasStripeCustomer: !!preview.client.external_id,
+          alreadySynced: preview.alreadySynced,
+          eligiblePayments: preview.eligiblePayments.map((p) => ({
+            id: p.id,
+            amount: p.amount,
+            due_date: p.due_date,
+            notes: p.notes,
+          })),
+          installmentAmount: preview.installmentAmount,
+          firstInstallmentDate: preview.firstInstallmentDate,
+          intervalMonths: preview.intervalMonths,
+          totalAmount: preview.eligiblePayments.reduce((sum, p) => sum + Number(p.amount), 0),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  syncStripe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { payment_method_id } = req.body || {};
+      const contract = await this.contractService.syncExistingContractToStripe(id, payment_method_id);
+      res.status(200).json({
+        success: true,
+        message: 'Contract synced with Stripe successfully',
+        data: contract,
       });
     } catch (error) {
       next(error);

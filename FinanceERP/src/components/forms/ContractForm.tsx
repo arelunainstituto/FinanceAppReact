@@ -73,6 +73,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
     value: '',
     start_date: '',
     end_date: '',
+    first_installment_date: '',
     status: 'ativo',
     payment_frequency: 'Mensal',
     notes: '',
@@ -195,6 +196,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
         value: contract.value?.toString() || '',
         start_date: contract.start_date || '',
         end_date: contract.end_date || '',
+        first_installment_date: contract.first_installment_date || '',
         status: contract.status || 'ativo',
         payment_frequency: contract.payment_frequency || 'Mensal',
         notes: contract.notes || '',
@@ -219,6 +221,7 @@ const ContractForm: React.FC<ContractFormProps> = ({
         value: '',
         start_date: '',
         end_date: '',
+        first_installment_date: '',
         status: 'ativo',
         payment_frequency: 'Mensal',
         notes: '',
@@ -356,46 +359,72 @@ const ContractForm: React.FC<ContractFormProps> = ({
     }
   };
 
+  // Parse de data no formato DD/MM/AAAA. Retorna null se inválida.
+  const parseDdMmYyyy = (value: string): Date | null => {
+    if (!value) return null;
+    const [day, month, year] = value.split('/');
+    if (!day || !month || !year) return null;
+    const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (isNaN(d.getTime())) return null;
+    return d;
+  };
+
+  const formatDdMmYyyy = (d: Date): string => {
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear().toString();
+    return `${day}/${month}/${year}`;
+  };
+
   // Calcula automaticamente a data de fim do contrato com base na frequência,
   // usando o mesmo clamping que o backend e a Stripe.
+  // Quando há first_installment_date, este vira a âncora; caso contrário, usa
+  // a convenção legada (start_date + 1 intervalo é a 1ª parcela).
   const calculateEndDate = (
     startDate: string,
     numberOfPayments: string,
     frequency: string,
+    firstInstallmentDate: string,
   ): string => {
-    if (!startDate || !numberOfPayments) return '';
+    if (!numberOfPayments) return '';
     const numPayments = parseInt(numberOfPayments);
     if (isNaN(numPayments) || numPayments <= 0) return '';
 
-    try {
-      const [day, month, year] = startDate.split('/');
-      if (!day || !month || !year) return '';
-      const startDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      const interval = monthsForFrequency(frequency || 'Mensal');
-      // end_date = fim do período de cobertura da última parcela
-      // (startDate + (numPayments + 1) intervalos) para alinhar com a Stripe.
-      const endDateObj = addMonthsClamped(startDateObj, (numPayments + 1) * interval);
-
-      const endDay = endDateObj.getDate().toString().padStart(2, '0');
-      const endMonth = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
-      const endYear = endDateObj.getFullYear().toString();
-      return `${endDay}/${endMonth}/${endYear}`;
-    } catch (error) {
-      console.error('Erro ao calcular data de fim:', error);
-      return '';
+    const interval = monthsForFrequency(frequency || 'Mensal');
+    const firstParcel = parseDdMmYyyy(firstInstallmentDate);
+    if (firstParcel) {
+      // end_date = first_installment_date + numPayments * intervalo
+      return formatDdMmYyyy(addMonthsClamped(firstParcel, numPayments * interval));
     }
+
+    const startDateObj = parseDdMmYyyy(startDate);
+    if (!startDateObj) return '';
+    // Comportamento legado: start_date + (numPayments + 1) intervalos
+    return formatDdMmYyyy(addMonthsClamped(startDateObj, (numPayments + 1) * interval));
   };
 
   const updateFieldWithEndDateCalculation = (field: keyof typeof formData, value: string) => {
     const newFormData = { ...formData, [field]: value };
 
-    if (field === 'start_date' || field === 'number_of_payments' || field === 'payment_frequency') {
+    if (
+      field === 'start_date' ||
+      field === 'number_of_payments' ||
+      field === 'payment_frequency' ||
+      field === 'first_installment_date'
+    ) {
       const startDate = field === 'start_date' ? value : formData.start_date;
       const numberOfPayments =
         field === 'number_of_payments' ? value : formData.number_of_payments;
       const frequency = field === 'payment_frequency' ? value : formData.payment_frequency;
+      const firstInstallment =
+        field === 'first_installment_date' ? value : formData.first_installment_date;
 
-      const calculatedEndDate = calculateEndDate(startDate, numberOfPayments, frequency);
+      const calculatedEndDate = calculateEndDate(
+        startDate,
+        numberOfPayments,
+        frequency,
+        firstInstallment,
+      );
       if (calculatedEndDate) {
         newFormData.end_date = calculatedEndDate;
       }
@@ -568,6 +597,16 @@ const ContractForm: React.FC<ContractFormProps> = ({
         onDateChange={(value) => updateFieldWithEndDateCalculation('start_date', value)}
         error={errors.start_date}
         placeholder="DD/MM/AAAA"
+        mode="date"
+      />
+
+      <DatePicker
+        label="Data da Primeira Parcela (opcional)"
+        value={formData.first_installment_date}
+        onDateChange={(value) =>
+          updateFieldWithEndDateCalculation('first_installment_date', value)
+        }
+        placeholder="DD/MM/AAAA (padrão: 1 intervalo após a data de início)"
         mode="date"
       />
 

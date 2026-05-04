@@ -27,6 +27,7 @@ import { convertDateFiltersToApiFormat } from '../utils/dateFormatUtils';
 import ContractForm from '../components/forms/ContractForm';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { ContractDetailsModal } from '../components/ContractDetailsModal';
+import StripeSyncWizard from '../components/StripeSyncWizard';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { exportContractsToCSV } from '../utils/csvExport';
 import PaginationControls from '../components/common/PaginationControls';
@@ -69,6 +70,9 @@ const ContractsScreen: React.FC = () => {
   // Contract details modal states
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+
+  // Stripe sync wizard state
+  const [stripeSyncContract, setStripeSyncContract] = useState<Contract | null>(null);
 
   // Advanced filters states
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -713,6 +717,13 @@ useEffect(() => {
                   variant="success"
                   onPress={() => navigation.navigate('Payments', { contractId: contract.id })}
                 />
+                {!contract.stripe_schedule_id && (
+                  <ActionButton
+                    icon="sync-outline"
+                    variant="warning"
+                    onPress={() => setStripeSyncContract(contract)}
+                  />
+                )}
                 <ActionButton
                   icon="pencil"
                   variant="primary"
@@ -772,6 +783,13 @@ useEffect(() => {
          }}
          initialFilters={advancedFilters}
        />
+
+      <StripeSyncWizard
+        visible={!!stripeSyncContract}
+        contract={stripeSyncContract}
+        onClose={() => setStripeSyncContract(null)}
+        onSuccess={() => loadContracts()}
+      />
     </MainLayout>
   );
 };

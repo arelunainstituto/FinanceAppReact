@@ -16,6 +16,8 @@ router.get('/', contractController.getAllContracts);
 router.get('/:id', contractController.getContractById);
 router.get('/:id/details', contractController.getContractDetails);
 router.get('/:id/balances', contractController.getContractBalances);
+router.get('/:id/stripe-sync-preview', contractController.getStripeSyncPreview);
+router.post('/:id/stripe-sync', contractController.syncStripe);
 router.post('/', validate(createContractSchema), contractController.createContract);
 router.put('/:id', validate(updateContractSchema), contractController.updateContract);
 router.delete('/:id', contractController.deleteContract);
