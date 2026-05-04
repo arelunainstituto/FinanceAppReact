@@ -18,7 +18,7 @@ export class ContractController {
         data: contracts,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -96,7 +96,7 @@ export class ContractController {
         });
       }
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -111,7 +111,7 @@ export class ContractController {
         data: contract,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -126,7 +126,7 @@ export class ContractController {
         data: contracts,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -141,7 +141,7 @@ export class ContractController {
         data: contract,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -157,7 +157,7 @@ export class ContractController {
         data: contract,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -171,7 +171,7 @@ export class ContractController {
         message: 'Contract deleted successfully',
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -181,7 +181,7 @@ export class ContractController {
       const contracts = await this.contractService.getContractsByStatus(status);
       res.json(contracts);
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -191,7 +191,7 @@ export class ContractController {
       const contractDetails = await this.contractService.getContractDetails(id);
       res.json(contractDetails);
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -205,7 +205,7 @@ export class ContractController {
         message: 'Contract payments deleted successfully',
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -220,7 +220,7 @@ export class ContractController {
         data: balances,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -251,7 +251,7 @@ export class ContractController {
         },
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 
@@ -266,7 +266,7 @@ export class ContractController {
         data: contract,
       });
     } catch (error) {
-      next(error);
+      console.error("🔥 Contract Creation Error:", error); next(error);
     }
   };
 }

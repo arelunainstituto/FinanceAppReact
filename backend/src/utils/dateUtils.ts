@@ -74,7 +74,26 @@ export const getPenultimateBusinessDay = (date: string | Date = new Date()): Dat
  * @param date - Data de referência (padrão: data atual)
  * @returns Data atual se for dia útil, ou último dia útil anterior
  */
-export const getCurrentOrLastBusinessDay = getPenultimateBusinessDay;
+export const getCurrentOrLastBusinessDay = (date: string | Date = new Date()): Date => {
+  try {
+    const referenceDate = new Date(date);
+    const dayOfWeek = referenceDate.getDay();
+    
+    let lastBusinessDay = new Date(referenceDate);
+    
+    // Se for fim de semana, voltar para o último dia útil
+    if (dayOfWeek === 6) { // Sábado
+      lastBusinessDay.setDate(lastBusinessDay.getDate() - 1); // Voltar para sexta
+    } else if (dayOfWeek === 0) { // Domingo
+      lastBusinessDay.setDate(lastBusinessDay.getDate() - 2); // Voltar para sexta
+    }
+    
+    return lastBusinessDay;
+  } catch (error) {
+    console.error('Erro ao calcular data útil:', error);
+    return new Date();
+  }
+};
 
 /**
  * Verifica se uma data é um dia útil (segunda a sexta-feira)

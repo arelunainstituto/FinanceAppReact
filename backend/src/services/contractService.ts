@@ -93,6 +93,11 @@ export class ContractService {
     const paymentMethodId: string | undefined = processedData.payment_method_id ?? undefined;
     delete processedData.payment_method_id;
 
+    // Extract first_installment_date (coluna não existe na tabela contracts do Supabase).
+    // Mantemos o valor para usar internamente na geração de parcelas e sync com Stripe.
+    const firstInstallmentDate: string | null | undefined = processedData.first_installment_date ?? undefined;
+    delete processedData.first_installment_date;
+
     const isStripePayment = paymentMethod === 'Stripe';
     
     // Set default status if not provided
@@ -112,11 +117,11 @@ export class ContractService {
       processedData.end_date = this.convertDateFormat(processedData.end_date);
     }
 
-    if (processedData.first_installment_date === '') {
-      processedData.first_installment_date = null;
-    } else if (processedData.first_installment_date) {
-      processedData.first_installment_date = this.convertDateFormat(processedData.first_installment_date);
-    }
+    // first_installment_date foi extraído acima e não vai para o DB.
+    // Convertemos para YYYY-MM-DD para uso interno (Stripe sync, geração de parcelas).
+    const convertedFirstInstallmentDate = firstInstallmentDate
+      ? this.convertDateFormat(firstInstallmentDate)
+      : null;
 
     // Validate date formats if they are provided
     if (processedData.start_date && typeof processedData.start_date === 'string') {
@@ -145,6 +150,9 @@ export class ContractService {
 
     // Create contract first
     const createdContract = await this.contractRepository.create(processedData);
+
+    // Inject first_installment_date (não persistida) no objecto para uso downstream
+    (createdContract as any).first_installment_date = convertedFirstInstallmentDate;
 
     // Generate automatic payments if required fields are present
     if (createdContract.start_date && createdContract.number_of_payments && createdContract.number_of_payments > 0) {
@@ -462,11 +470,10 @@ export class ContractService {
       processedData.end_date = this.convertDateFormat(processedData.end_date);
     }
 
-    if (processedData.first_installment_date === '') {
-      processedData.first_installment_date = null;
-    } else if (processedData.first_installment_date) {
-      processedData.first_installment_date = this.convertDateFormat(processedData.first_installment_date);
-    }
+    // first_installment_date não existe na tabela do Supabase — remover antes do update
+    delete processedData.first_installment_date;
+    // Remover também payment_method_id se existir
+    delete processedData.payment_method_id;
 
     // Validate date formats if they are provided
     if (processedData.start_date && typeof processedData.start_date === 'string') {

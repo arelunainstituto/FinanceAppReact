@@ -157,8 +157,9 @@ export class StripeController {
     }
 
     if (payment.status !== 'paid') {
-      await this.paymentRepository.markAsPaid(payment.id);
-      console.log(`[Webhook] ✅ Payment ${payment.id} marked as paid (Stripe invoice ${invoice.id})`);
+      const amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : payment.amount;
+      await this.paymentRepository.markAsPaid(payment.id, amountPaid);
+      console.log(`[Webhook] ✅ Payment ${payment.id} marked as paid (Stripe invoice ${invoice.id}, amount: ${amountPaid})`);
 
       // Verificar se todas as parcelas do contrato foram pagas → marcar contrato como liquidado
       if (payment.contract_id) {
@@ -211,6 +212,7 @@ export class StripeController {
     }
 
     console.log(`[Webhook] Resolved contractId: ${contractId} for invoice ${invoice.id}`);
+    // Stripe invoices are only for 'normalPayment' (recurring), never for 'downPayment'
     return this.paymentRepository.findFirstPendingByContract(contractId, 'normalPayment');
   }
 
@@ -296,7 +298,7 @@ export class StripeController {
             continue;
           }
           // Parcela encontrada mas não paga — atualizar
-          await this.paymentRepository.markAsPaid(existing.id);
+          await this.paymentRepository.markAsPaid(existing.id, inv.amountPaid || existing.amount);
           await this.paymentRepository.update(existing.id, { external_id: inv.invoiceId });
           updated++;
           details.push({ invoiceId: inv.invoiceId, contractId: inv.contractId, paymentId: existing.id, action: 'marked_paid' });
@@ -305,7 +307,7 @@ export class StripeController {
         }
 
         // Procurar próxima parcela pendente para este contrato
-        const pending = await this.paymentRepository.findFirstPendingByContract(inv.contractId, 'normalPayment');
+        const pending = await this.paymentRepository.findFirstPendingByContract(inv.contractId);
         if (!pending) {
           notFound++;
           details.push({ invoiceId: inv.invoiceId, contractId: inv.contractId, action: 'no_pending_payment' });
@@ -313,7 +315,7 @@ export class StripeController {
         }
 
         await this.paymentRepository.update(pending.id, { external_id: inv.invoiceId });
-        await this.paymentRepository.markAsPaid(pending.id);
+        await this.paymentRepository.markAsPaid(pending.id, inv.amountPaid || pending.amount);
         updated++;
         details.push({ invoiceId: inv.invoiceId, contractId: inv.contractId, paymentId: pending.id, action: 'marked_paid' });
         await this.tryMarkContractAsLiquidado(pending.contract_id);

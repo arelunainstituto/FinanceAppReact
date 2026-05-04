@@ -1172,15 +1172,21 @@ export class PaymentRepository {
     }
   }
 
-  async markAsPaid(id: string): Promise<Payment | null> {
+  async markAsPaid(id: string, paid_amount?: number): Promise<Payment | null> {
     try {
       const businessDay = getCurrentOrLastBusinessDay();
+      const updateData: any = {
+        status: 'paid',
+        paid_date: businessDay.toISOString().split('T')[0], // Formato YYYY-MM-DD do dia útil atual ou anterior
+      };
+      
+      if (paid_amount !== undefined) {
+        updateData.paid_amount = paid_amount;
+      }
+
       const { data, error } = await supabase
         .from('payments')
-        .update({
-          status: 'paid',
-          paid_date: businessDay.toISOString().split('T')[0], // Formato YYYY-MM-DD do dia útil atual ou anterior
-        })
+        .update(updateData)
         .eq('id', id)
         .select(`
           *,
