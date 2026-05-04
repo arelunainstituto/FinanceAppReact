@@ -42,8 +42,8 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Allow any Vercel preview URL from our project
-    if (origin.match(/^https:\/\/financeapp-(areluna|lime).*\.vercel\.app$/)) {
+    // Allow any Vercel preview URL
+    if (origin.match(/^https:\/\/.*\.vercel\.app$/)) {
       return callback(null, true);
     }
 
