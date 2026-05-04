@@ -32,6 +32,7 @@ import { exportPaymentsToCSV } from '../utils/csvExport';
 import ExportConfirmModal from '../components/common/ExportConfirmModal';
 import PaginationControls from '../components/common/PaginationControls';
 import ImportPaymentsModal from '../components/ImportPaymentsModal';
+import StripeSyncWizard from '../components/StripeSyncWizard';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
@@ -61,6 +62,10 @@ const PaymentsScreen: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [contractNumber, setContractNumber] = useState<string>('');
+  const [currentContract, setCurrentContract] = useState<any>(null);
+  
+  // Stripe Sync Wizard State
+  const [showStripeWizard, setShowStripeWizard] = useState(false);
   
   // Pagination state from backend
   const [totalPages, setTotalPages] = useState(0);
@@ -180,8 +185,9 @@ const PaymentsScreen: React.FC = () => {
           console.log(`✅ Loaded ${response.data.data.length} payments for contract (page ${currentPage}/${response.data.totalPages})`);
           
           // Find the contract number for display purposes
-          if (response.data.data.length > 0 && response.data.data[0].contract?.contract_number) {
+          if (response.data.data.length > 0 && response.data.data[0].contract) {
             setContractNumber(response.data.data[0].contract.contract_number);
+            setCurrentContract(response.data.data[0].contract);
           }
         }
       } else {
@@ -825,6 +831,22 @@ const PaymentsScreen: React.FC = () => {
               )}
             </View>
             <View style={styles.headerButtons}>
+              {contractId && currentContract && (
+                currentContract.stripe_schedule_id || currentContract.stripe_subscription_id ? (
+                  <View style={styles.syncedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.syncedBadgeText}>Sincronizado</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.syncButton}
+                    onPress={() => setShowStripeWizard(true)}
+                  >
+                    <Ionicons name="sync" size={16} color="#6366f1" />
+                    <Text style={styles.syncButtonText}>Sincronizar Stripe</Text>
+                  </TouchableOpacity>
+                )
+              )}
               <TouchableOpacity
                 style={styles.importButton}
                 onPress={() => setShowImportModal(true)}
@@ -1050,6 +1072,15 @@ const PaymentsScreen: React.FC = () => {
         onSuccess={() => {
           loadPayments();
           setShowImportModal(false);
+        }}
+      />
+
+      <StripeSyncWizard
+        visible={showStripeWizard}
+        contract={currentContract}
+        onClose={() => setShowStripeWizard(false)}
+        onSuccess={() => {
+          loadPayments();
         }}
       />
     </MainLayout>
@@ -1291,6 +1322,38 @@ const styles = StyleSheet.create({
   },
   exportButtonTextDisabled: {
     color: '#9CA3AF',
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  syncButtonText: {
+    fontSize: 14,
+    color: '#6366f1',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  syncedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  syncedBadgeText: {
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '500',
+    marginLeft: 6,
   },
 });
 

@@ -3,15 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Contract } from '../types';
 import Button from './common/Button';
+import { Modal } from './common/Modal';
 import StripePaymentSetup from './StripePaymentSetup';
 import ApiService from '../services/api';
 
@@ -22,7 +22,10 @@ interface StripeSyncWizardProps {
   onSuccess: () => void;
 }
 
-type SyncStep = 'summary' | 'payment' | 'confirming';
+type SyncStep = 'summary' | 'payment' | 'confirming' | 'success';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isTablet = screenWidth > 768;
 
 interface SyncPreview {
   contractId: string;
@@ -107,9 +110,8 @@ const StripeSyncWizard: React.FC<StripeSyncWizardProps> = ({
       if (!response.success) {
         throw new Error(response.message || 'Falha ao sincronizar com Stripe');
       }
-      Alert.alert('Sucesso', 'Contrato sincronizado com Stripe.');
+      setStep('success');
       onSuccess();
-      onClose();
     } catch (e: any) {
       setError(e?.message || 'Falha ao sincronizar com Stripe');
       setStep('payment');
@@ -119,6 +121,7 @@ const StripeSyncWizard: React.FC<StripeSyncWizardProps> = ({
   };
 
   const renderStepIndicator = () => {
+    if (step === 'success') return null;
     const currentIdx = STEPS.findIndex((s) => s.key === step);
     return (
       <View style={styles.stepIndicatorContainer}>
@@ -286,6 +289,21 @@ const StripeSyncWizard: React.FC<StripeSyncWizardProps> = ({
     </View>
   );
 
+  const renderSuccess = () => (
+    <View style={styles.successContainer}>
+      <View style={styles.successIconWrapper}>
+        <Ionicons name="checkmark-circle" size={80} color="#10B981" />
+      </View>
+      <Text style={styles.successTitle}>Sincronização Concluída!</Text>
+      <Text style={styles.successMessage}>
+        O contrato foi sincronizado com sucesso no Stripe. As parcelas pendentes agora serão cobradas automaticamente nas datas de vencimento.
+      </Text>
+      <View style={{ marginTop: 24, width: '100%' }}>
+        <Button title="Concluir" onPress={onClose} variant="primary" />
+      </View>
+    </View>
+  );
+
   const renderActiveStep = () => {
     switch (step) {
       case 'summary':
@@ -294,6 +312,8 @@ const StripeSyncWizard: React.FC<StripeSyncWizardProps> = ({
         return renderPayment();
       case 'confirming':
         return renderConfirming();
+      case 'success':
+        return renderSuccess();
       default:
         return null;
     }
@@ -305,35 +325,23 @@ const StripeSyncWizard: React.FC<StripeSyncWizardProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      title="Sincronizar com Stripe"
+      onClose={onClose}
+      width={isTablet ? '50%' : '90%'}
     >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Sincronizar com Stripe</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#64748B" />
-          </TouchableOpacity>
+      {renderStepIndicator()}
+      {renderActiveStep()}
+
+      {step === 'summary' && (
+        <View style={styles.footer}>
+          <Button title="Cancelar" variant="secondary" onPress={onClose} />
+          <Button
+            title="Avançar para pagamento"
+            onPress={() => setStep('payment')}
+            disabled={!canAdvanceFromSummary}
+          />
         </View>
-
-        {renderStepIndicator()}
-
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
-          {renderActiveStep()}
-        </ScrollView>
-
-        {step === 'summary' && (
-          <View style={styles.footer}>
-            <Button title="Cancelar" variant="secondary" onPress={onClose} />
-            <Button
-              title="Avançar para pagamento"
-              onPress={() => setStep('payment')}
-              disabled={!canAdvanceFromSummary}
-            />
-          </View>
-        )}
-      </View>
+      )}
     </Modal>
   );
 };
@@ -426,9 +434,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    padding: 16,
+    paddingTop: 16,
+    marginTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
+  },
+  successContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successIconWrapper: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 16,
   },
 });
 
