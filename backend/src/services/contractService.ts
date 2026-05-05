@@ -48,7 +48,7 @@ export class ContractService {
     return this.contractRepository.findByClientId(clientId);
   }
 
-  // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
+   // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
   private convertDateFormat(dateString: string): string {
     if (!dateString) return dateString;
     
@@ -63,6 +63,22 @@ export class ContractService {
     
     // If it's already in YYYY-MM-DD format or other format, return as is
     return dateString;
+  }
+
+  /**
+   * Parseia uma string de data (YYYY-MM-DD ou DD/MM/YYYY) como data LOCAL,
+   * evitando que `new Date('2026-07-07')` seja interpretado como UTC midnight
+   * (o que pode resultar no dia anterior em fusos-horário positivos).
+   */
+  private parseDateAsLocal(dateString: string): Date {
+    const converted = this.convertDateFormat(dateString);
+    // Tentar extrair partes de YYYY-MM-DD
+    const parts = converted.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (parts) {
+      return new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
+    }
+    // Fallback para o parser nativo
+    return new Date(dateString);
   }
 
   async createContract(contractData: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<Contract> {
@@ -224,21 +240,27 @@ export class ContractService {
       });
 
       const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
-      const startDate = new Date(contract.start_date as any);
+      // Parsear start_date como data local (não UTC) para evitar desvios de fuso-horário.
+      // new Date('2026-07-07') = UTC midnight = pode ser dia anterior no fuso local.
+      const startDateStr = String(contract.start_date);
+      const startDate = this.parseDateAsLocal(startDateStr);
       // Se houver first_installment_date no contrato, usa-o como âncora para a Stripe
       // (mantém alinhamento com generateAutomaticPayments). Caso contrário, usa o
       // comportamento legado: start_date + 1 intervalo.
       let firstInstallmentDate = contract.first_installment_date
-        ? new Date(contract.first_installment_date as any)
+        ? this.parseDateAsLocal(String(contract.first_installment_date))
         : addMonthsClamped(startDate, intervalMonths);
 
-      // Se a data da 1ª parcela ficou no passado, ajustar para o futuro mais próximo
-      const now = new Date();
-      if (firstInstallmentDate <= now) {
+      // Se a data da 1ª parcela ficou no passado, ajustar para o futuro mais próximo.
+      // Comparação date-only para evitar falsos positivos por diferença de horas/tz.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const firstInstallmentDay = new Date(firstInstallmentDate);
+      firstInstallmentDay.setHours(0, 0, 0, 0);
+      if (firstInstallmentDay < today) {
         console.warn(`[Stripe] firstInstallmentDate (${firstInstallmentDate.toISOString()}) is in the past. Adjusting to tomorrow.`);
-        const tomorrow = new Date(now);
+        const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(0, 0, 0, 0);
         firstInstallmentDate = tomorrow;
       }
 
@@ -327,7 +349,7 @@ export class ContractService {
 
     const intervalMonths = getMonthsForPaymentFrequency(contract.payment_frequency);
     const firstInstallmentDate = eligiblePayments[0]
-      ? new Date(eligiblePayments[0].due_date)
+      ? this.parseDateAsLocal(String(eligiblePayments[0].due_date))
       : new Date();
     const installmentAmount = eligiblePayments[0] ? Number(eligiblePayments[0].amount) : 0;
 

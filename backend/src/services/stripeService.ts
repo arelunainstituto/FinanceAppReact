@@ -121,13 +121,31 @@ export class StripeService {
       metadata: { internal_contract_id: params.contractId },
     });
 
-    const startDateUnix = Math.floor(params.firstInstallmentDate.getTime() / 1000);
-    console.log(`[Stripe] Schedule start_date: ${params.firstInstallmentDate.toISOString()} (unix: ${startDateUnix}), iterations: ${params.numberOfPayments}`);
+    // Normalizar o timestamp para meio-dia UTC (12:00) para evitar que
+    // diferenças de fuso-horário façam o Stripe interpretar a data num dia
+    // diferente do pretendido (ex: 07/07 00:00 UTC → 06/07 em UTC-X).
+    const noonUtc = new Date(Date.UTC(
+      params.firstInstallmentDate.getFullYear(),
+      params.firstInstallmentDate.getMonth(),
+      params.firstInstallmentDate.getDate(),
+      12, 0, 0,
+    ));
+    const startDateUnix = Math.floor(noonUtc.getTime() / 1000);
+    console.log(`[Stripe] Schedule start_date: ${noonUtc.toISOString()} (unix: ${startDateUnix}), iterations: ${params.numberOfPayments}`);
 
     const scheduleParams: Stripe.SubscriptionScheduleCreateParams = {
       customer: params.stripeCustomerId,
       start_date: startDateUnix,
       end_behavior: 'cancel',
+      // Forçar billing_cycle_anchor = phase_start para que a Stripe cobre
+      // exatamente na data de start_date (e não numa data "automática").
+      default_settings: {
+        billing_cycle_anchor: 'phase_start',
+        ...(params.paymentMethodId && {
+          default_payment_method: params.paymentMethodId,
+        }),
+        collection_method: 'charge_automatically',
+      },
       phases: [{
         items: [{ price: price.id, quantity: 1 }],
         iterations: params.numberOfPayments,
@@ -136,13 +154,6 @@ export class StripeService {
       }],
       metadata: { internal_contract_id: params.contractId },
     };
-
-    if (params.paymentMethodId) {
-      scheduleParams.default_settings = {
-        default_payment_method: params.paymentMethodId,
-        collection_method: 'charge_automatically',
-      };
-    }
 
     const schedule = await this.stripe.subscriptionSchedules.create(scheduleParams);
     console.log(`[Stripe] Subscription schedule created: ${schedule.id}, status: ${schedule.status}`);
